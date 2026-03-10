@@ -10,3 +10,4 @@ chroma_data/
 dist/
 build/
 .ruff_cache/
+.claude/
