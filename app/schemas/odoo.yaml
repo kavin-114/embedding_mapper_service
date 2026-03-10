@@ -1,0 +1,64 @@
+erp_system: odoo
+id_type: integer  # Odoo uses integer IDs
+
+field_map:
+  invoice_number: ref
+  invoice_date: invoice_date
+  vendor_name: partner_id  # M2O relation, expects (id, name) tuple
+  currency: currency_id
+  total_amount: amount_total
+
+line_items_key: invoice_line_ids
+
+line_item_map:
+  description: name
+  quantity: quantity
+  unit_price: price_unit
+  uom: product_uom_id   # M2O relation
+  tax_rate: tax_ids      # M2M relation, expects [(6, 0, [ids])]
+
+fk_fields:
+  vendor_name:
+    collection: vendors
+    hard_key:
+      metadata_field: gstin
+      source_field: vendor_gstin
+    filters:
+      - category
+      - state_code
+      - active
+
+  description:
+    collection: items
+    hard_key:
+      metadata_field: item_code
+      source_field: item_code
+    filters:
+      - hsn_code
+      - uom
+      - item_group
+      - active
+
+  uom:
+    collection: uoms
+    hard_key:
+      metadata_field: uom_code
+      source_field: uom
+    filters: []
+
+  tax_rate:
+    collection: tax_codes
+    hard_key:
+      metadata_field: rate
+      source_field: tax_rate
+    filters:
+      - rate
+      - tax_type
+      - component
+      - active
+
+# Odoo-specific: ORM command tuples for M2M fields
+orm_tuples:
+  tax_ids: [6, 0]       # (6, 0, [list_of_ids])
+  partner_id: m2o        # plain integer ID
+  product_uom_id: m2o

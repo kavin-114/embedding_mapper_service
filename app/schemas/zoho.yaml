@@ -1,0 +1,58 @@
+erp_system: zoho
+id_type: long_string  # Zoho Books uses long numeric string IDs
+
+field_map:
+  invoice_number: bill_number
+  invoice_date: date
+  vendor_name: vendor_id
+  currency: currency_code
+  total_amount: total
+
+line_items_key: line_items
+
+line_item_map:
+  description: name
+  quantity: quantity
+  unit_price: rate
+  uom: unit
+  tax_rate: tax_id
+
+fk_fields:
+  vendor_name:
+    collection: vendors
+    hard_key:
+      metadata_field: gstin
+      source_field: vendor_gstin
+    filters:
+      - category
+      - state_code
+      - active
+
+  description:
+    collection: items
+    hard_key:
+      metadata_field: item_code
+      source_field: item_code
+    filters:
+      - hsn_code
+      - uom
+      - item_group
+      - active
+
+  uom:
+    collection: uoms
+    hard_key:
+      metadata_field: uom_code
+      source_field: uom
+    filters: []
+
+  tax_rate:
+    collection: tax_codes
+    hard_key:
+      metadata_field: rate
+      source_field: tax_rate
+    filters:
+      - rate
+      - tax_type
+      - component
+      - active

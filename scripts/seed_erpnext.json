@@ -1,0 +1,370 @@
+{
+  "tenant_id": "tenant_a",
+  "erp_system": "erpnext",
+
+  "vendors": [
+    {
+      "erp_id": "Tata Steel Trading Co",
+      "text": "Tata Steel Trading Co Steel Manufacturer",
+      "gstin": "27AAACT2727Q1ZV",
+      "category": "Raw Material",
+      "state_code": "27",
+      "active": true
+    },
+    {
+      "erp_id": "Bharat Electricals Pvt Ltd",
+      "text": "Bharat Electricals Pvt Ltd Electrical Supplier",
+      "gstin": "29AABCB1234A1Z5",
+      "category": "Electrical",
+      "state_code": "29",
+      "active": true
+    },
+    {
+      "erp_id": "Chennai Auto Parts Ltd",
+      "text": "Chennai Auto Parts Ltd Automobile Spare Parts",
+      "gstin": "33AABCC5678D1ZR",
+      "category": "Auto Parts",
+      "state_code": "33",
+      "active": true
+    },
+    {
+      "erp_id": "Kumar Hardware and Tools",
+      "text": "Kumar Hardware and Tools General Hardware Store",
+      "gstin": "29AABCK8765B1Z3",
+      "category": "Hardware",
+      "state_code": "29",
+      "active": true
+    },
+    {
+      "erp_id": "Jindal Stainless Ltd",
+      "text": "Jindal Stainless Ltd Stainless Steel Supplier",
+      "gstin": "06AABCJ4321C1Z9",
+      "category": "Raw Material",
+      "state_code": "06",
+      "active": true
+    },
+    {
+      "erp_id": "Havells India Ltd",
+      "text": "Havells India Ltd Electrical Equipment Manufacturer",
+      "gstin": "07AAACH9012D1Z7",
+      "category": "Electrical",
+      "state_code": "07",
+      "active": true
+    },
+    {
+      "erp_id": "Polycab India Ltd",
+      "text": "Polycab India Ltd Cables and Wires",
+      "gstin": "24AABCP6543E1Z1",
+      "category": "Electrical",
+      "state_code": "24",
+      "active": true
+    },
+    {
+      "erp_id": "Sundaram Fasteners Ltd",
+      "text": "Sundaram Fasteners Ltd Nuts Bolts Fasteners",
+      "gstin": "33AABCS3210F1Z4",
+      "category": "Hardware",
+      "state_code": "33",
+      "active": true
+    },
+    {
+      "erp_id": "Ashok Leyland Spares",
+      "text": "Ashok Leyland Spares Automobile Parts Division",
+      "gstin": "33AABCA7654G1Z8",
+      "category": "Auto Parts",
+      "state_code": "33",
+      "active": true
+    },
+    {
+      "erp_id": "Supreme Industries Ltd",
+      "text": "Supreme Industries Ltd PVC Pipes Fittings Plastics",
+      "gstin": "27AABCS1098H1Z2",
+      "category": "Plumbing",
+      "state_code": "27",
+      "active": true
+    }
+  ],
+
+  "items": [
+    {
+      "erp_id": "HR-COIL-2MM-E250",
+      "text": "HR Coil 2.0mm IS2062 E250 Grade Hot Rolled Steel Coil",
+      "hsn_code": "7208",
+      "uom": "MT",
+      "item_group": "Raw Material",
+      "item_code": "HR-COIL-2MM-E250",
+      "active": true
+    },
+    {
+      "erp_id": "HR-COIL-3MM-E250",
+      "text": "HR Coil 3.0mm IS2062 E250 Grade Hot Rolled Steel Coil",
+      "hsn_code": "7208",
+      "uom": "MT",
+      "item_group": "Raw Material",
+      "item_code": "HR-COIL-3MM-E250",
+      "active": true
+    },
+    {
+      "erp_id": "CABLE-CU-4SQMM",
+      "text": "Copper Cable 4 sq mm FRLS Fire Retardant Low Smoke",
+      "hsn_code": "8544",
+      "uom": "MTR",
+      "item_group": "Electrical",
+      "item_code": "CABLE-CU-4SQMM",
+      "active": true
+    },
+    {
+      "erp_id": "CABLE-CU-2.5SQMM",
+      "text": "Copper Cable 2.5 sq mm FRLS Fire Retardant Low Smoke",
+      "hsn_code": "8544",
+      "uom": "MTR",
+      "item_group": "Electrical",
+      "item_code": "CABLE-CU-2.5SQMM",
+      "active": true
+    },
+    {
+      "erp_id": "PVC-CONDUIT-25MM",
+      "text": "PVC Conduit Pipe 25mm Heavy Gauge Rigid",
+      "hsn_code": "3917",
+      "uom": "PCS",
+      "item_group": "Electrical",
+      "item_code": "PVC-CONDUIT-25MM",
+      "active": true
+    },
+    {
+      "erp_id": "PVC-CONDUIT-20MM",
+      "text": "PVC Conduit Pipe 20mm Medium Gauge",
+      "hsn_code": "3917",
+      "uom": "PCS",
+      "item_group": "Electrical",
+      "item_code": "PVC-CONDUIT-20MM",
+      "active": true
+    },
+    {
+      "erp_id": "JB-METAL-4WAY",
+      "text": "Junction Box Metal 4 Way Square Electrical Junction Box",
+      "hsn_code": "8538",
+      "uom": "NOS",
+      "item_group": "Electrical",
+      "item_code": "JB-METAL-4WAY",
+      "active": true
+    },
+    {
+      "erp_id": "JB-PVC-ROUND",
+      "text": "Junction Box PVC Round Concealed Type",
+      "hsn_code": "8538",
+      "uom": "NOS",
+      "item_group": "Electrical",
+      "item_code": "JB-PVC-ROUND",
+      "active": true
+    },
+    {
+      "erp_id": "BRK-DISC-280",
+      "text": "Brake Disc Rotor 280mm Ventilated Front Disc Brake",
+      "hsn_code": "8708",
+      "uom": "NOS",
+      "item_group": "Auto Parts",
+      "item_code": "BRK-DISC-280",
+      "active": true
+    },
+    {
+      "erp_id": "BRK-DISC-260",
+      "text": "Brake Disc Rotor 260mm Solid Rear Disc Brake",
+      "hsn_code": "8708",
+      "uom": "NOS",
+      "item_group": "Auto Parts",
+      "item_code": "BRK-DISC-260",
+      "active": true
+    },
+    {
+      "erp_id": "BRK-PAD-CER",
+      "text": "Brake Pad Set Ceramic Low Dust Front Brake Pad",
+      "hsn_code": "6813",
+      "uom": "SET",
+      "item_group": "Auto Parts",
+      "item_code": "BRK-PAD-CER",
+      "active": true
+    },
+    {
+      "erp_id": "BRK-PAD-SEMI",
+      "text": "Brake Pad Set Semi-Metallic Standard Front Brake Pad",
+      "hsn_code": "6813",
+      "uom": "SET",
+      "item_group": "Auto Parts",
+      "item_code": "BRK-PAD-SEMI",
+      "active": true
+    },
+    {
+      "erp_id": "GI-WIRE-16G-10KG",
+      "text": "GI Wire 16 Gauge Galvanized Iron Wire 10kg Coil",
+      "hsn_code": "7217",
+      "uom": "COIL",
+      "item_group": "Hardware",
+      "item_code": "GI-WIRE-16G-10KG",
+      "active": true
+    },
+    {
+      "erp_id": "BIND-WIRE-20G",
+      "text": "Binding Wire 20 Gauge MS Black Annealed Binding Wire",
+      "hsn_code": "7217",
+      "uom": "KG",
+      "item_group": "Hardware",
+      "item_code": "BIND-WIRE-20G",
+      "active": true
+    },
+    {
+      "erp_id": "BOLT-M10-50-SS",
+      "text": "Stainless Steel Bolt M10x50mm Hex Head",
+      "hsn_code": "7318",
+      "uom": "NOS",
+      "item_group": "Hardware",
+      "item_code": "BOLT-M10-50-SS",
+      "active": true
+    },
+    {
+      "erp_id": "STATIONERY-KIT-A4",
+      "text": "Office Stationery Kit A4 Assorted Files Folders Pens",
+      "hsn_code": "4820",
+      "uom": "SET",
+      "item_group": "Office Supplies",
+      "item_code": "STATIONERY-KIT-A4",
+      "active": true
+    }
+  ],
+
+  "tax_codes": [
+    {
+      "erp_id": "Output Tax IGST - 18%",
+      "text": "IGST 18% Integrated Goods and Services Tax",
+      "rate": "18",
+      "tax_type": "GST",
+      "component": "IGST",
+      "active": true
+    },
+    {
+      "erp_id": "Output Tax CGST - 9%",
+      "text": "CGST 9% Central Goods and Services Tax",
+      "rate": "9",
+      "tax_type": "GST",
+      "component": "CGST_SGST",
+      "active": true
+    },
+    {
+      "erp_id": "Output Tax SGST - 9%",
+      "text": "SGST 9% State Goods and Services Tax",
+      "rate": "9",
+      "tax_type": "GST",
+      "component": "CGST_SGST",
+      "active": true
+    },
+    {
+      "erp_id": "Output Tax IGST - 28%",
+      "text": "IGST 28% Integrated Goods and Services Tax",
+      "rate": "28",
+      "tax_type": "GST",
+      "component": "IGST",
+      "active": true
+    },
+    {
+      "erp_id": "Output Tax CGST - 14%",
+      "text": "CGST 14% Central Goods and Services Tax",
+      "rate": "14",
+      "tax_type": "GST",
+      "component": "CGST_SGST",
+      "active": true
+    },
+    {
+      "erp_id": "Output Tax SGST - 14%",
+      "text": "SGST 14% State Goods and Services Tax",
+      "rate": "14",
+      "tax_type": "GST",
+      "component": "CGST_SGST",
+      "active": true
+    },
+    {
+      "erp_id": "Output Tax IGST - 12%",
+      "text": "IGST 12% Integrated Goods and Services Tax",
+      "rate": "12",
+      "tax_type": "GST",
+      "component": "IGST",
+      "active": true
+    },
+    {
+      "erp_id": "Output Tax CGST - 6%",
+      "text": "CGST 6% Central Goods and Services Tax",
+      "rate": "6",
+      "tax_type": "GST",
+      "component": "CGST_SGST",
+      "active": true
+    },
+    {
+      "erp_id": "Output Tax SGST - 6%",
+      "text": "SGST 6% State Goods and Services Tax",
+      "rate": "6",
+      "tax_type": "GST",
+      "component": "CGST_SGST",
+      "active": true
+    },
+    {
+      "erp_id": "Output Tax IGST - 5%",
+      "text": "IGST 5% Integrated Goods and Services Tax",
+      "rate": "5",
+      "tax_type": "GST",
+      "component": "IGST",
+      "active": true
+    },
+    {
+      "erp_id": "Output Tax CGST - 2.5%",
+      "text": "CGST 2.5% Central Goods and Services Tax",
+      "rate": "2.5",
+      "tax_type": "GST",
+      "component": "CGST_SGST",
+      "active": true
+    },
+    {
+      "erp_id": "Output Tax SGST - 2.5%",
+      "text": "SGST 2.5% State Goods and Services Tax",
+      "rate": "2.5",
+      "tax_type": "GST",
+      "component": "CGST_SGST",
+      "active": true
+    },
+    {
+      "erp_id": "Input Tax IGST - 18%",
+      "text": "Input IGST 18% Purchase Integrated Tax",
+      "rate": "18",
+      "tax_type": "GST",
+      "component": "IGST",
+      "active": true
+    },
+    {
+      "erp_id": "Input Tax CGST - 9%",
+      "text": "Input CGST 9% Purchase Central Tax",
+      "rate": "9",
+      "tax_type": "GST",
+      "component": "CGST_SGST",
+      "active": true
+    },
+    {
+      "erp_id": "Input Tax SGST - 9%",
+      "text": "Input SGST 9% Purchase State Tax",
+      "rate": "9",
+      "tax_type": "GST",
+      "component": "CGST_SGST",
+      "active": true
+    }
+  ],
+
+  "uoms": [
+    {"erp_id": "Nos", "text": "Nos Numbers Each Piece", "uom_code": "NOS"},
+    {"erp_id": "Kg", "text": "Kg Kilogram Weight", "uom_code": "KG"},
+    {"erp_id": "Meter", "text": "Meter Mtr Linear Metre Length", "uom_code": "MTR"},
+    {"erp_id": "Set", "text": "Set Pair Kit Bundle", "uom_code": "SET"},
+    {"erp_id": "MT", "text": "MT Metric Ton Tonne 1000kg", "uom_code": "MT"},
+    {"erp_id": "Pcs", "text": "Pcs Pieces Individual Units", "uom_code": "PCS"},
+    {"erp_id": "Coil", "text": "Coil Roll Spool Wire Coil", "uom_code": "COIL"},
+    {"erp_id": "Box", "text": "Box Carton Pack Container", "uom_code": "BOX"},
+    {"erp_id": "Ltr", "text": "Ltr Litre Liquid Volume", "uom_code": "LTR"},
+    {"erp_id": "Sqm", "text": "Sqm Square Meter Area", "uom_code": "SQM"}
+  ]
+}

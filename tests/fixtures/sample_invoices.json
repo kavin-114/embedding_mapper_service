@@ -1,0 +1,145 @@
+{
+  "high_confidence_invoice": {
+    "_comment": "All FK fields >= 0.90 — should trigger HARD_KEY strategy everywhere",
+    "invoice_number": "INV-2025-0042",
+    "invoice_date": "2025-07-10",
+    "vendor_name": {"value": "Tata Steel Trading Co", "confidence": 0.96},
+    "vendor_gstin": {"value": "27AAACT2727Q1ZV", "confidence": 0.94},
+    "currency": "INR",
+    "total_amount": 236000.00,
+    "line_items": [
+      {
+        "description": {"value": "HR Coil 2.0mm IS2062 E250", "confidence": 0.93},
+        "quantity": 10.0,
+        "unit_price": 20000.00,
+        "uom": {"value": "MT", "confidence": 0.97},
+        "tax_rate": {"value": "18", "confidence": 0.95},
+        "hsn_code": {"value": "7208", "confidence": 0.91},
+        "item_code": {"value": "HR-COIL-2MM-E250", "confidence": 0.92}
+      }
+    ]
+  },
+
+  "mixed_confidence_invoice": {
+    "_comment": "Varied confidence — exercises HARD_KEY, FILTERED_SEMANTIC, PURE_SEMANTIC, and skip paths",
+    "invoice_number": "INV-2025-0198",
+    "invoice_date": "2025-08-22",
+    "vendor_name": {"value": "Bharat Electricals Pvt Ltd", "confidence": 0.82},
+    "vendor_gstin": {"value": "29AABCB1234A1Z5", "confidence": 0.91},
+    "currency": "INR",
+    "total_amount": 47200.00,
+    "line_items": [
+      {
+        "_comment": "item_code high → HARD_KEY, hsn mid → filter, uom high → HARD_KEY",
+        "description": {"value": "Copper Cable 4 sq mm FRLS", "confidence": 0.85},
+        "quantity": 500.0,
+        "unit_price": 80.00,
+        "uom": {"value": "MTR", "confidence": 0.93},
+        "tax_rate": {"value": "18", "confidence": 0.92},
+        "hsn_code": {"value": "8544", "confidence": 0.76},
+        "item_code": {"value": "CABLE-CU-4SQMM", "confidence": 0.95}
+      },
+      {
+        "_comment": "No item_code, low hsn → pure semantic, uom medium → filter",
+        "description": {"value": "PVC Conduit Pipe 25mm", "confidence": 0.72},
+        "quantity": 100.0,
+        "unit_price": 45.00,
+        "uom": {"value": "PCS", "confidence": 0.78},
+        "tax_rate": {"value": "18", "confidence": 0.88},
+        "hsn_code": {"value": "3917", "confidence": 0.55},
+        "item_code": null
+      },
+      {
+        "_comment": "Very low confidence across the board → pure semantic / skip",
+        "description": {"value": "Junction box", "confidence": 0.48},
+        "quantity": 20.0,
+        "unit_price": 120.00,
+        "uom": {"value": "NOS", "confidence": 0.42},
+        "tax_rate": {"value": "18", "confidence": 0.65},
+        "hsn_code": {"value": "8538", "confidence": 0.35},
+        "item_code": null
+      }
+    ]
+  },
+
+  "unknown_vendor_invoice": {
+    "_comment": "Vendor not in system — triggers unknown vendor handler (Stage 3)",
+    "invoice_number": "INV-2025-0301",
+    "invoice_date": "2025-09-05",
+    "vendor_name": {"value": "XYZ New Supplier Enterprises", "confidence": 0.60},
+    "vendor_gstin": {"value": "06AABCX9876P1ZQ", "confidence": 0.72},
+    "currency": "INR",
+    "total_amount": 5900.00,
+    "line_items": [
+      {
+        "description": {"value": "Office Stationery Kit A4", "confidence": 0.68},
+        "quantity": 50.0,
+        "unit_price": 100.00,
+        "uom": {"value": "SET", "confidence": 0.80},
+        "tax_rate": {"value": "12", "confidence": 0.85},
+        "hsn_code": {"value": "4820", "confidence": 0.73},
+        "item_code": null
+      }
+    ]
+  },
+
+  "interstate_invoice": {
+    "_comment": "Vendor state (33-TN) != company state (29-KA) — should resolve to IGST",
+    "invoice_number": "INV-2025-0455",
+    "invoice_date": "2025-10-12",
+    "vendor_name": {"value": "Chennai Auto Parts Ltd", "confidence": 0.91},
+    "vendor_gstin": {"value": "33AABCC5678D1ZR", "confidence": 0.93},
+    "currency": "INR",
+    "total_amount": 177000.00,
+    "line_items": [
+      {
+        "description": {"value": "Brake Disc Rotor 280mm", "confidence": 0.90},
+        "quantity": 200.0,
+        "unit_price": 750.00,
+        "uom": {"value": "NOS", "confidence": 0.96},
+        "tax_rate": {"value": "28", "confidence": 0.94},
+        "hsn_code": {"value": "8708", "confidence": 0.88},
+        "item_code": {"value": "BRK-DISC-280", "confidence": 0.91}
+      },
+      {
+        "description": {"value": "Brake Pad Set Ceramic", "confidence": 0.87},
+        "quantity": 200.0,
+        "unit_price": 135.00,
+        "uom": {"value": "SET", "confidence": 0.94},
+        "tax_rate": {"value": "28", "confidence": 0.93},
+        "hsn_code": {"value": "6813", "confidence": 0.82},
+        "item_code": {"value": "BRK-PAD-CER", "confidence": 0.90}
+      }
+    ]
+  },
+
+  "no_gstin_invoice": {
+    "_comment": "No GSTIN at all — vendor resolution purely semantic, no state-code boost/penalty",
+    "invoice_number": "INV-2025-0512",
+    "invoice_date": "2025-11-01",
+    "vendor_name": {"value": "Kumar Hardware Store", "confidence": 0.88},
+    "vendor_gstin": null,
+    "currency": "INR",
+    "total_amount": 8260.00,
+    "line_items": [
+      {
+        "description": {"value": "GI Wire 16 gauge 10kg coil", "confidence": 0.79},
+        "quantity": 5.0,
+        "unit_price": 1400.00,
+        "uom": {"value": "COIL", "confidence": 0.60},
+        "tax_rate": {"value": "18", "confidence": 0.91},
+        "hsn_code": {"value": "7217", "confidence": 0.84},
+        "item_code": null
+      },
+      {
+        "description": {"value": "Binding Wire 20g", "confidence": 0.74},
+        "quantity": 3.0,
+        "unit_price": 220.00,
+        "uom": {"value": "KG", "confidence": 0.92},
+        "tax_rate": {"value": "18", "confidence": 0.90},
+        "hsn_code": null,
+        "item_code": null
+      }
+    ]
+  }
+}
