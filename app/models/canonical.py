@@ -49,7 +49,8 @@ class CanonicalInvoice(BaseModel):
     invoice_number: str
     invoice_date: date
     vendor_name: ScoredField
-    vendor_gstin: ScoredField | None = None
+    vendor_tax_id: ScoredField | None = None
+    vendor_tax_id_type: str | None = None
     currency: str = "INR"
     total_amount: float
     line_items: list[CanonicalLineItem]

@@ -31,8 +31,9 @@ class Settings(BaseSettings):
     # --- Embedding model ---
     embedding_model: str = "all-MiniLM-L6-v2"
 
-    # --- Company context (used for IGST/CGST determination) ---
-    company_state_code: str = "29"  # Karnataka default
+    # --- Company context (used for tax scope determination) ---
+    company_country: str = "IN"
+    company_region_code: str = "29"  # Karnataka default
 
     # --- Sync staleness ---
     sync_stale_hours: int = 6

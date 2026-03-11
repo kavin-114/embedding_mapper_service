@@ -55,22 +55,22 @@ class Resolver:
           Step 2: Else → semantic search on vendor_name with state_code boost/penalty.
           Step 3: Evaluate score → FOUND / SUGGEST / NOT_FOUND.
         """
-        gstin_field = invoice.vendor_gstin
+        tax_id_field = invoice.vendor_tax_id
         threshold = self._settings.hard_key_threshold
 
-        # Step 1 — hard match on GSTIN if high confidence
-        if gstin_field and gstin_field.confidence >= threshold:
+        # Step 1 — hard match on tax_id if high confidence
+        if tax_id_field and tax_id_field.confidence >= threshold:
             meta = self._vector.hard_match(
                 entity="vendors",
                 tenant_id=tenant_id,
                 erp_system=erp_system,
-                where={"gstin": str(gstin_field.value)},
+                where={"tax_id": str(tax_id_field.value)},
             )
             if meta is not None:
                 return (
                     FKMatch(
                         erp_id=meta["erp_id"],
-                        matched_on=f"gstin={gstin_field.value}",
+                        matched_on=f"tax_id={tax_id_field.value}",
                         strategy=ResolutionStrategy.HARD_KEY,
                         confidence=1.0,
                         candidates=[],
@@ -100,16 +100,14 @@ class Resolver:
         top = results[0]
         top_score = top["score"]
 
-        # State-code boost / penalty from GSTIN
-        if gstin_field and gstin_field.value:
-            gstin_str = str(gstin_field.value)
-            if len(gstin_str) >= 2:
-                extracted_state = gstin_str[:2]
-                vendor_state = top["metadata"].get("state_code", "")
-                if str(vendor_state) == extracted_state:
-                    top_score = min(1.0, top_score + 0.08)
-                else:
-                    top_score = max(0.0, top_score - 0.15)
+        # Region-code boost / penalty: compare vendor region with company
+        vendor_region = str(top["metadata"].get("region_code", ""))
+        company_region = self._settings.company_region_code
+        if vendor_region and company_region:
+            if vendor_region == company_region:
+                top_score = min(1.0, top_score + 0.08)
+            else:
+                top_score = max(0.0, top_score - 0.15)
 
         candidates = [
             {"erp_id": r["erp_id"], "score": r["score"], "metadata": r["metadata"]}
@@ -225,22 +223,11 @@ class Resolver:
             )
 
         # 4. Build fallback context
-        tax_component: str | None = None
-        gstin_field = invoice.vendor_gstin
-        if (
-            gstin_field
-            and gstin_field.value
-            and gstin_field.confidence >= self._settings.suggest_threshold
-        ):
-            tax_component = ContextBuilder.derive_tax_component_from_gstin(
-                str(gstin_field.value),
-                self._settings.company_state_code,
-            )
-
         context = InvoiceContext(
             vendor_known=False,
             vendor_erp_id=None,
-            tax_component=tax_component,
+            tax_scope=None,
+            tax_component=None,
             item_group_filter=None,
             confidence_floor=0.50,
         )

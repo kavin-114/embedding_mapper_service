@@ -37,7 +37,8 @@ def settings() -> Settings:
     return Settings(
         chroma_host="localhost",
         chroma_port=8000,
-        company_state_code="29",
+        company_country="IN",
+        company_region_code="29",
     )
 
 
@@ -80,11 +81,11 @@ def unknown_vendor_invoice(all_sample_invoices) -> CanonicalInvoice:
 
 @pytest.fixture
 def interstate_invoice(all_sample_invoices) -> CanonicalInvoice:
-    """Interstate invoice (TN→KA) — should resolve to IGST."""
+    """Interstate invoice — vendor region != company region."""
     return all_sample_invoices["interstate_invoice"]
 
 
 @pytest.fixture
-def no_gstin_invoice(all_sample_invoices) -> CanonicalInvoice:
-    """Invoice with no GSTIN — purely semantic vendor resolution."""
-    return all_sample_invoices["no_gstin_invoice"]
+def no_tax_id_invoice(all_sample_invoices) -> CanonicalInvoice:
+    """Invoice with no tax ID — purely semantic vendor resolution."""
+    return all_sample_invoices["no_tax_id_invoice"]

@@ -35,16 +35,16 @@ Each collection stores one ERP native ID in metadata field `erp_id`. No cross-ER
 | < 0.50      | Skip, pure semantic|
 
 ## Pipeline Stages
-1. **Load ERP Schema** — Read YAML config for target ERP.
-2. **Vendor Resolution** — Hard-match on GSTIN or semantic search with state_code boost/penalty.
+1. **Load ERP Schema** — Read YAML config for target ERP (includes `tax_scope_map`).
+2. **Vendor Resolution** — Hard-match on `tax_id` or semantic search with region_code boost/penalty.
 3. **Unknown Vendor Handler** — Check sync freshness, try partial match, or declare unknown.
-4. **Context Enrichment** — Build InvoiceContext from vendor metadata + vendor purchase history.
+4. **Context Enrichment** — Build InvoiceContext from vendor metadata + vendor purchase history. Derives generic `tax_scope` (INTRA_REGION/INTER_REGION/IMPORT) from country+region comparison, then maps to ERP-specific `tax_component` via YAML `tax_scope_map`.
 5. **Line Item Resolution** — Resolve item, UOM, and tax FK fields per line item (with history boost).
 6. **Transform Payload** — Rename keys and reshape to ERP-native format using YAML field_map.
 
 ## Vendor Resolution Details
-- GSTIN confidence >= 0.90 → hard match
-- Else → semantic search on vendor_name, with state_code boost (+0.08) or penalty (-0.15)
+- `vendor_tax_id` confidence >= 0.90 → hard match on `tax_id` metadata field
+- Else → semantic search on vendor_name, with region_code boost (+0.08 if same as company) or penalty (-0.15 if different)
 - Score >= 0.88 → FOUND, 0.50–0.87 → SUGGEST, < 0.50 → NOT_FOUND
 
 ## Unknown Vendor Handler
@@ -61,12 +61,39 @@ When an invoice is flagged SUGGEST/REVIEW, a human reviews and approves the corr
 3. On repeat approvals, frequency increments (more frequent = higher trust).
 4. During Stage 4 (Context Enrichment), the context_builder queries vendor history.
 5. During Stage 5 (Item Resolution), items found in vendor history get a +0.10 score boost.
-6. Verified GSTIN from feedback is carried in InvoiceContext for downstream use.
+6. Verified `tax_id` from feedback is carried in InvoiceContext for downstream use.
 
 ### Collection schema (vendor_context):
 - **ID**: `{vendor_erp_id}__{item_erp_id}`
 - **Embed**: `"{vendor_name} {item_description}"`
-- **Metadata**: vendor_erp_id, vendor_gstin, item_erp_id, item_code, hsn_code, uom, description, frequency
+- **Metadata**: vendor_erp_id, vendor_tax_id, item_erp_id, item_code, hsn_code, uom, description, frequency
+
+## Vendor Collection Metadata Schema
+| Field | Type | Description |
+|-------|------|-------------|
+| erp_id | str | ERP-native primary key |
+| tax_id | str | Tax identifier (GSTIN, VAT, EIN, TIN, etc.) |
+| tax_id_type | str | Type of tax ID: GSTIN, VAT, EIN, TIN |
+| pan | str | PAN number (India-specific, optional) |
+| trade_name | str | Trade/brand name (embedded for semantic matching) |
+| category | str | Vendor category (Raw Material, Electrical, etc.) |
+| country | str | ISO country code (IN, US, GB, etc.) |
+| region_code | str | State/region code within the country |
+| city | str | City name (embedded for semantic matching) |
+| pincode | str | Postal/ZIP code |
+| supplier_type | str | Company or Individual |
+| currency | str | Default currency (INR, USD, EUR) |
+| active | bool | Whether the vendor is active |
+
+## Tax Scope (Generic)
+Tax scope is determined by comparing vendor's country/region with company's:
+| Comparison | Tax Scope |
+|-----------|-----------|
+| Different country | IMPORT |
+| Same country, different region | INTER_REGION |
+| Same country, same region | INTRA_REGION |
+
+ERP YAML `tax_scope_map` converts these to ERP-specific values (e.g., INTER_REGION → IGST).
 
 ## Confidence Decision Thresholds
 | Score Range | Status    |

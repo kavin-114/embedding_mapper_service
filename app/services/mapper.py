@@ -66,11 +66,11 @@ class MapperService:
                 vendor_meta = vendor_match.candidates[0].get("metadata", {})
             elif vendor_match.strategy == ResolutionStrategy.HARD_KEY:
                 # Hard key match — fetch metadata from collection
-                gstin_field = invoice.vendor_gstin
-                if gstin_field:
+                tax_id_field = invoice.vendor_tax_id
+                if tax_id_field:
                     fetched = self._vector.hard_match(
                         "vendors", tenant_id, erp_system,
-                        {"gstin": str(gstin_field.value)},
+                        {"tax_id": str(tax_id_field.value)},
                     )
                     if fetched:
                         vendor_meta = fetched
@@ -88,15 +88,15 @@ class MapperService:
             context = InvoiceContext(
                 vendor_known=False,
                 vendor_erp_id=vendor_match.erp_id,
+                tax_scope=None,
                 tax_component=None,
                 confidence_floor=0.50,
             )
-            # Try to derive tax component from GSTIN
-            if invoice.vendor_gstin and invoice.vendor_gstin.confidence >= 0.70:
-                context.tax_component = ContextBuilder.derive_tax_component_from_gstin(
-                    str(invoice.vendor_gstin.value),
-                    self._settings.company_state_code,
-                )
+
+        # Map generic tax_scope → ERP-specific tax_component via schema
+        if context.tax_scope and not context.tax_component:
+            scope_map = transformer.get_tax_scope_map()
+            context.tax_component = scope_map.get(context.tax_scope)
 
         # Stage 5 — Line item resolution
         resolved_lines: list[ResolvedLineItem] = []

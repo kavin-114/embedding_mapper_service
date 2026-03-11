@@ -33,7 +33,7 @@ class FeedbackRequest(BaseModel):
     # Vendor details (human-verified)
     vendor_erp_id: str
     vendor_name: str
-    vendor_gstin: str | None = None
+    vendor_tax_id: str | None = None
 
     # Approved line-item mappings
     line_items: list[ApprovedLineItem]
