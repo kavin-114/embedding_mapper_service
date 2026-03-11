@@ -41,6 +41,10 @@ class Transformer:
         """Return the ERP-specific key name for the line items array."""
         return self._schema.get("line_items_key", "items")
 
+    def get_tax_scope_map(self) -> dict[str, str]:
+        """Return the tax_scope → ERP component mapping."""
+        return self._schema.get("tax_scope_map", {})
+
     def get_id_type(self) -> str:
         """Return the ERP's ID type (name_string | integer | long_string)."""
         return self._schema.get("id_type", "name_string")

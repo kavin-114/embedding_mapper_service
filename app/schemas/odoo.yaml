@@ -21,11 +21,11 @@ fk_fields:
   vendor_name:
     collection: vendors
     hard_key:
-      metadata_field: gstin
-      source_field: vendor_gstin
+      metadata_field: tax_id
+      source_field: vendor_tax_id
     filters:
       - category
-      - state_code
+      - region_code
       - active
 
   description:
@@ -62,3 +62,9 @@ orm_tuples:
   tax_ids: [6, 0]       # (6, 0, [list_of_ids])
   partner_id: m2o        # plain integer ID
   product_uom_id: m2o
+
+# Generic tax scope → ERP-specific component mapping
+tax_scope_map:
+  INTRA_REGION: CGST_SGST
+  INTER_REGION: IGST
+  IMPORT: IGST

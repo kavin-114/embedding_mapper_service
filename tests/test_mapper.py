@@ -57,6 +57,8 @@ class TestCanonicalModelValidation:
     def test_sample_invoice_is_valid(self, sample_invoice):
         assert sample_invoice.invoice_number == "INV-2025-0042"
         assert len(sample_invoice.line_items) == 1
+        assert sample_invoice.vendor_tax_id is not None
+        assert sample_invoice.vendor_tax_id_type == "GSTIN"
 
     def test_scored_field_bounds(self):
         with pytest.raises(Exception):

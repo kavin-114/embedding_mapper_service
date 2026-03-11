@@ -23,7 +23,7 @@ class TestFeedbackModels:
             invoice_number="INV-001",
             vendor_erp_id="Tata Steel Trading Co",
             vendor_name="Tata Steel Trading Co",
-            vendor_gstin="27AAACT2727Q1ZV",
+            vendor_tax_id="27AAACT2727Q1ZV",
             line_items=[
                 ApprovedLineItem(
                     description="HR Coil 2.0mm",
@@ -100,7 +100,7 @@ class TestVendorContextStorage:
             erp_system="erpnext",
             vendor_erp_id="Tata Steel Trading Co",
             vendor_name="Tata Steel Trading Co",
-            vendor_gstin="27AAACT2727Q1ZV",
+            vendor_tax_id="27AAACT2727Q1ZV",
             items=items,
             embedding_fn=embedding_fn,
         )
@@ -110,8 +110,8 @@ class TestVendorContextStorage:
         call_kwargs = mock_collection.upsert.call_args.kwargs
         # IDs should be vendor__item
         assert "Tata Steel Trading Co__HR-COIL-2MM-E250" in call_kwargs["ids"]
-        # Metadata should include vendor_gstin
-        assert call_kwargs["metadatas"][0]["vendor_gstin"] == "27AAACT2727Q1ZV"
+        # Metadata should include vendor_tax_id
+        assert call_kwargs["metadatas"][0]["vendor_tax_id"] == "27AAACT2727Q1ZV"
         assert call_kwargs["metadatas"][0]["frequency"] == 1
 
     @patch("app.services.vector_service.chromadb.HttpClient")
@@ -136,7 +136,7 @@ class TestVendorContextStorage:
             erp_system="erpnext",
             vendor_erp_id="V1",
             vendor_name="Vendor One",
-            vendor_gstin=None,
+            vendor_tax_id=None,
             items=[{"item_erp_id": "I1", "description": "Item One"}],
             embedding_fn=embedding_fn,
         )
@@ -190,7 +190,7 @@ class TestVendorContextStorage:
 
 class TestContextBuilderWithHistory:
     def test_build_with_preferred_items(self):
-        settings = Settings(company_state_code="29")
+        settings = Settings(company_country="IN", company_region_code="29")
         builder = ContextBuilder(settings)
 
         mock_vector = MagicMock()
@@ -201,7 +201,7 @@ class TestContextBuilderWithHistory:
                 "hsn_code": "7208",
                 "description": "HR Coil 2.0mm",
                 "frequency": 5,
-                "vendor_gstin": "27AAACT2727Q1ZV",
+                "vendor_tax_id": "27AAACT2727Q1ZV",
             },
             {
                 "item_erp_id": "HR-COIL-3MM-E250",
@@ -213,7 +213,7 @@ class TestContextBuilderWithHistory:
         ]
 
         ctx = builder.build(
-            vendor_metadata={"state_code": "27", "category": "Raw Material"},
+            vendor_metadata={"country": "IN", "region_code": "27", "category": "Raw Material"},
             vendor_erp_id="Tata Steel Trading Co",
             vendor_confidence=0.95,
             vector_svc=mock_vector,
@@ -224,32 +224,32 @@ class TestContextBuilderWithHistory:
         assert len(ctx.preferred_items) == 2
         assert ctx.preferred_items[0]["item_erp_id"] == "HR-COIL-2MM-E250"
         assert ctx.preferred_items[0]["frequency"] == 5
-        assert ctx.verified_gstin == "27AAACT2727Q1ZV"
-        assert ctx.tax_component == "IGST"  # state 27 != company 29
+        assert ctx.verified_tax_id == "27AAACT2727Q1ZV"
+        assert ctx.tax_scope == "INTER_REGION"  # region 27 != company 29
 
     def test_build_without_history_still_works(self):
-        settings = Settings(company_state_code="29")
+        settings = Settings(company_country="IN", company_region_code="29")
         builder = ContextBuilder(settings)
 
         ctx = builder.build(
-            vendor_metadata={"state_code": "29"},
+            vendor_metadata={"country": "IN", "region_code": "29"},
             vendor_erp_id="SUP-001",
             vendor_confidence=0.90,
         )
 
         assert ctx.preferred_items == []
-        assert ctx.verified_gstin is None
-        assert ctx.tax_component == "CGST_SGST"
+        assert ctx.verified_tax_id is None
+        assert ctx.tax_scope == "INTRA_REGION"
 
     def test_build_with_empty_history(self):
-        settings = Settings(company_state_code="29")
+        settings = Settings(company_country="IN", company_region_code="29")
         builder = ContextBuilder(settings)
 
         mock_vector = MagicMock()
         mock_vector.get_vendor_context.return_value = []
 
         ctx = builder.build(
-            vendor_metadata={"state_code": "29"},
+            vendor_metadata={"country": "IN", "region_code": "29"},
             vendor_erp_id="SUP-NEW",
             vendor_confidence=0.90,
             vector_svc=mock_vector,
@@ -258,7 +258,7 @@ class TestContextBuilderWithHistory:
         )
 
         assert ctx.preferred_items == []
-        assert ctx.verified_gstin is None
+        assert ctx.verified_tax_id is None
 
 
 # ── Resolver preferred_items boost tests ────────────────────────────

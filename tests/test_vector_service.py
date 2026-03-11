@@ -53,8 +53,8 @@ class TestUpsert:
         svc = VectorService(settings)
 
         records = [
-            {"erp_id": "SUP-001", "text": "Acme Supplies", "gstin": "29ABC", "category": "Raw"},
-            {"erp_id": "SUP-002", "text": "Beta Corp", "gstin": "33XYZ", "category": "Service"},
+            {"erp_id": "SUP-001", "text": "Acme Supplies", "tax_id": "29ABC", "category": "Raw"},
+            {"erp_id": "SUP-002", "text": "Beta Corp", "tax_id": "33XYZ", "category": "Service"},
         ]
         embedding_fn = MagicMock(return_value=[[0.1] * 10, [0.2] * 10])
 
@@ -88,14 +88,14 @@ class TestHardMatch:
         mock_collection = MagicMock()
         mock_collection.get.return_value = {
             "ids": ["SUP-001"],
-            "metadatas": [{"erp_id": "SUP-001", "gstin": "29ABC"}],
+            "metadatas": [{"erp_id": "SUP-001", "tax_id": "29ABC"}],
         }
         MockClient.return_value.get_or_create_collection.return_value = mock_collection
 
         settings = Settings(chroma_host="localhost", chroma_port=8000)
         svc = VectorService(settings)
 
-        result = svc.hard_match("vendors", "t1", "erpnext", {"gstin": "29ABC"})
+        result = svc.hard_match("vendors", "t1", "erpnext", {"tax_id": "29ABC"})
         assert result is not None
         assert result["erp_id"] == "SUP-001"
 
@@ -108,7 +108,7 @@ class TestHardMatch:
         settings = Settings(chroma_host="localhost", chroma_port=8000)
         svc = VectorService(settings)
 
-        result = svc.hard_match("vendors", "t1", "erpnext", {"gstin": "NOPE"})
+        result = svc.hard_match("vendors", "t1", "erpnext", {"tax_id": "NOPE"})
         assert result is None
 
 

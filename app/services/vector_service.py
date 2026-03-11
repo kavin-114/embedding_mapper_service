@@ -20,8 +20,12 @@ _DISTANCE_TO_SCORE = lambda d: max(0.0, 1.0 - d)
 
 def _build_text_vendors(rec: dict[str, Any]) -> str:
     parts = [rec.get("text", "")]
+    if rec.get("trade_name"):
+        parts.append(rec["trade_name"])
     if rec.get("category"):
         parts.append(rec["category"])
+    if rec.get("city"):
+        parts.append(rec["city"])
     return " ".join(p for p in parts if p)
 
 
@@ -239,7 +243,7 @@ class VectorService:
         erp_system: str,
         vendor_erp_id: str,
         vendor_name: str,
-        vendor_gstin: str | None,
+        vendor_tax_id: str | None,
         items: list[dict[str, Any]],
         embedding_fn: Callable[[list[str]], list[list[float]]],
     ) -> int:
@@ -251,7 +255,7 @@ class VectorService:
         Collection: vendor_context__{tenant}__{erp}
         ID:         {vendor_erp_id}__{item_erp_id}
         Embed:      "{vendor_name} {item_description}"
-        Metadata:   vendor_erp_id, vendor_gstin, item_erp_id, item_code,
+        Metadata:   vendor_erp_id, vendor_tax_id, item_erp_id, item_code,
                     hsn_code, uom, description, frequency
         """
         if not items:
@@ -289,8 +293,8 @@ class VectorService:
                 "description": desc,
                 "frequency": frequency,
             }
-            if vendor_gstin:
-                meta["vendor_gstin"] = vendor_gstin
+            if vendor_tax_id:
+                meta["vendor_tax_id"] = vendor_tax_id
             if item.get("item_code"):
                 meta["item_code"] = str(item["item_code"])
             if item.get("hsn_code"):

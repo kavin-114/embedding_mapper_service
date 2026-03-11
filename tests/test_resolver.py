@@ -23,7 +23,8 @@ def mock_settings() -> Settings:
     return Settings(
         chroma_host="localhost",
         chroma_port=8000,
-        company_state_code="29",
+        company_country="IN",
+        company_region_code="29",
     )
 
 
@@ -87,14 +88,14 @@ class TestConfidenceDecisions:
 
 
 class TestVendorResolution:
-    def test_hard_match_on_high_confidence_gstin(
+    def test_hard_match_on_high_confidence_tax_id(
         self, resolver, mock_vector, sample_invoice
     ):
-        """GSTIN >= 0.90 → hard match → FOUND with confidence 1.0."""
+        """tax_id >= 0.90 → hard match → FOUND with confidence 1.0."""
         mock_vector.hard_match.return_value = {
             "erp_id": "SUP-001",
-            "gstin": "27AAACT2727Q1ZV",
-            "state_code": "27",
+            "tax_id": "27AAACT2727Q1ZV",
+            "region_code": "27",
         }
 
         match, status = resolver.resolve_vendor(sample_invoice, "t1", "erpnext")
@@ -105,17 +106,17 @@ class TestVendorResolution:
         assert match.erp_id == "SUP-001"
         mock_vector.hard_match.assert_called_once()
 
-    def test_semantic_fallback_when_gstin_hard_match_fails(
+    def test_semantic_fallback_when_tax_id_hard_match_fails(
         self, resolver, mock_vector, mock_embedding, sample_invoice
     ):
-        """GSTIN hard match miss → semantic search on vendor_name."""
+        """tax_id hard match miss → semantic search on vendor_name."""
         mock_vector.hard_match.return_value = None
         mock_vector.semantic_search.return_value = [
             {
                 "erp_id": "SUP-002",
                 "score": 0.92,
                 "distance": 0.08,
-                "metadata": {"state_code": "27", "erp_id": "SUP-002"},
+                "metadata": {"region_code": "29", "erp_id": "SUP-002"},
             }
         ]
 
@@ -125,18 +126,17 @@ class TestVendorResolution:
         assert match.strategy == ResolutionStrategy.PURE_SEMANTIC
         mock_vector.semantic_search.assert_called_once()
 
-    def test_state_code_boost_when_gstin_matches(
+    def test_region_code_boost_when_matches_company(
         self, resolver, mock_vector, sample_invoice
     ):
-        """State code from GSTIN matches vendor → +0.08 boost."""
+        """Vendor region matches company region (29) → +0.08 boost."""
         mock_vector.hard_match.return_value = None
-        # GSTIN is 27AAACT... → state "27", vendor state "27" → boost
         mock_vector.semantic_search.return_value = [
             {
                 "erp_id": "SUP-002",
                 "score": 0.82,
                 "distance": 0.18,
-                "metadata": {"state_code": "27", "erp_id": "SUP-002"},
+                "metadata": {"region_code": "29", "erp_id": "SUP-002"},
             }
         ]
 
@@ -146,17 +146,17 @@ class TestVendorResolution:
         assert status == VendorStatus.FOUND
         assert match.confidence == pytest.approx(0.90, abs=0.01)
 
-    def test_state_code_penalty_when_gstin_mismatches(
+    def test_region_code_penalty_when_mismatches_company(
         self, resolver, mock_vector, sample_invoice
     ):
-        """State code from GSTIN != vendor state → -0.15 penalty."""
+        """Vendor region != company region → -0.15 penalty."""
         mock_vector.hard_match.return_value = None
         mock_vector.semantic_search.return_value = [
             {
                 "erp_id": "SUP-003",
                 "score": 0.85,
                 "distance": 0.15,
-                "metadata": {"state_code": "33", "erp_id": "SUP-003"},
+                "metadata": {"region_code": "33", "erp_id": "SUP-003"},
             }
         ]
 
@@ -177,10 +177,10 @@ class TestVendorResolution:
         assert status == VendorStatus.NOT_FOUND
         assert match.strategy == ResolutionStrategy.NOT_FOUND
 
-    def test_no_gstin_skips_hard_match(
-        self, resolver, mock_vector, no_gstin_invoice
+    def test_no_tax_id_skips_hard_match(
+        self, resolver, mock_vector, no_tax_id_invoice
     ):
-        """Invoice with no GSTIN → goes straight to semantic search."""
+        """Invoice with no tax_id → goes straight to semantic search."""
         mock_vector.semantic_search.return_value = [
             {
                 "erp_id": "SUP-010",
@@ -190,7 +190,7 @@ class TestVendorResolution:
             }
         ]
 
-        match, status = resolver.resolve_vendor(no_gstin_invoice, "t1", "erpnext")
+        match, status = resolver.resolve_vendor(no_tax_id_invoice, "t1", "erpnext")
 
         assert status == VendorStatus.FOUND
         mock_vector.hard_match.assert_not_called()
@@ -235,10 +235,10 @@ class TestUnknownVendorHandler:
         assert status == VendorStatus.SUGGEST
         assert match.erp_id == "SUP-X"
 
-    def test_fallback_context_derives_tax_from_gstin(
+    def test_fallback_context_has_no_tax_scope(
         self, resolver, mock_vector, mock_embedding, unknown_vendor_invoice
     ):
-        """GSTIN '06...' with confidence 0.72 → IGST (state 06 != company 29)."""
+        """Unknown vendor → fallback context has no tax_scope."""
         mock_vector.get_sync_time.return_value = datetime.now(timezone.utc)
         mock_vector.semantic_search.return_value = []
 
@@ -246,7 +246,8 @@ class TestUnknownVendorHandler:
             unknown_vendor_invoice, "t1", "erpnext"
         )
 
-        assert ctx.tax_component == "IGST"
+        assert ctx.tax_scope is None
+        assert ctx.tax_component is None
         assert ctx.vendor_known is False
 
 

@@ -42,7 +42,7 @@ async def submit_feedback(
         erp_system=body.erp_system,
         vendor_erp_id=body.vendor_erp_id,
         vendor_name=body.vendor_name,
-        vendor_gstin=body.vendor_gstin,
+        vendor_tax_id=body.vendor_tax_id,
         items=items,
         embedding_fn=embedding_svc.encode,
     )

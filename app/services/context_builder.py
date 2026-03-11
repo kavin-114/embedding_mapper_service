@@ -14,12 +14,13 @@ if TYPE_CHECKING:
 class ContextBuilder:
     """Builds the InvoiceContext used by downstream resolvers (Stage 4).
 
-    Takes the vendor match metadata, compares state codes for tax component,
+    Takes the vendor match metadata, compares country/region for tax scope,
     and queries the vendor_context collection for historic item preferences.
     """
 
     def __init__(self, settings: "Settings") -> None:
-        self._company_state_code = settings.company_state_code
+        self._company_country = settings.company_country
+        self._company_region_code = settings.company_region_code
 
     def build(
         self,
@@ -32,29 +33,29 @@ class ContextBuilder:
     ) -> InvoiceContext:
         """Build InvoiceContext from resolved vendor metadata.
 
-        - Compare vendor state_code with company state_code for tax component.
+        - Compare vendor country/region with company for tax scope.
         - Use vendor category as item_group_filter.
         - Query vendor_context collection for preferred items (if available).
-        - Use verified GSTIN from feedback history.
+        - Use verified tax_id from feedback history.
         """
-        vendor_state = str(vendor_metadata.get("state_code", ""))
-        company_state = self._company_state_code
+        vendor_country = str(vendor_metadata.get("country", ""))
+        vendor_region = str(vendor_metadata.get("region_code", ""))
 
-        if vendor_state and company_state:
-            tax_component = (
-                "CGST_SGST" if vendor_state == company_state else "IGST"
-            )
-        else:
-            tax_component = None
+        tax_scope = self.derive_tax_scope(
+            vendor_country,
+            vendor_region,
+            self._company_country,
+            self._company_region_code,
+        )
 
         item_group = vendor_metadata.get("category") or vendor_metadata.get("item_group")
 
         # Higher vendor confidence → lower floor
         confidence_floor = max(0.40, 0.50 - (vendor_confidence - 0.70) * 0.33)
 
-        # Query vendor history for preferred items and verified GSTIN
+        # Query vendor history for preferred items and verified tax_id
         preferred_items: list[dict[str, Any]] = []
-        verified_gstin: str | None = None
+        verified_tax_id: str | None = None
 
         if vector_svc and tenant_id and erp_system and vendor_erp_id:
             history = vector_svc.get_vendor_context(
@@ -73,32 +74,44 @@ class ContextBuilder:
                     }
                     for h in history
                 ]
-                # Use the verified GSTIN from the most frequent record
-                verified_gstin = history[0].get("vendor_gstin")
+                # Use the verified tax_id from the most frequent record
+                verified_tax_id = history[0].get("vendor_tax_id")
 
         return InvoiceContext(
             vendor_known=True,
             vendor_erp_id=vendor_erp_id,
-            tax_component=tax_component,
+            tax_scope=tax_scope,
+            tax_component=None,
             item_group_filter=str(item_group) if item_group else None,
             confidence_floor=confidence_floor,
             preferred_items=preferred_items,
-            verified_gstin=verified_gstin,
+            verified_tax_id=verified_tax_id,
         )
 
     @staticmethod
-    def derive_tax_component_from_gstin(
-        gstin: str,
-        company_state_code: str,
+    def derive_tax_scope(
+        vendor_country: str,
+        vendor_region: str,
+        company_country: str,
+        company_region: str,
     ) -> str | None:
-        """Derive IGST/CGST_SGST from a GSTIN's first 2 digits."""
-        if not gstin or len(gstin) < 2:
+        """Derive tax scope from vendor vs company country/region.
+
+        Returns:
+            INTRA_REGION  — same country + same region
+            INTER_REGION  — same country + different region
+            IMPORT        — different country
+            None          — insufficient data
+        """
+        if not vendor_country or not company_country:
             return None
 
-        vendor_state = gstin[:2]
-        if not vendor_state.isdigit():
-            return None
+        if vendor_country != company_country:
+            return "IMPORT"
 
-        if vendor_state == company_state_code:
-            return "CGST_SGST"
-        return "IGST"
+        if vendor_region and company_region:
+            if vendor_region == company_region:
+                return "INTRA_REGION"
+            return "INTER_REGION"
+
+        return None

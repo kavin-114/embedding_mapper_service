@@ -4,7 +4,8 @@
     "invoice_number": "INV-2025-0042",
     "invoice_date": "2025-07-10",
     "vendor_name": {"value": "Tata Steel Trading Co", "confidence": 0.96},
-    "vendor_gstin": {"value": "27AAACT2727Q1ZV", "confidence": 0.94},
+    "vendor_tax_id": {"value": "27AAACT2727Q1ZV", "confidence": 0.94},
+    "vendor_tax_id_type": "GSTIN",
     "currency": "INR",
     "total_amount": 236000.00,
     "line_items": [
@@ -25,7 +26,8 @@
     "invoice_number": "INV-2025-0198",
     "invoice_date": "2025-08-22",
     "vendor_name": {"value": "Bharat Electricals Pvt Ltd", "confidence": 0.82},
-    "vendor_gstin": {"value": "29AABCB1234A1Z5", "confidence": 0.91},
+    "vendor_tax_id": {"value": "29AABCB1234A1Z5", "confidence": 0.91},
+    "vendor_tax_id_type": "GSTIN",
     "currency": "INR",
     "total_amount": 47200.00,
     "line_items": [
@@ -67,7 +69,8 @@
     "invoice_number": "INV-2025-0301",
     "invoice_date": "2025-09-05",
     "vendor_name": {"value": "XYZ New Supplier Enterprises", "confidence": 0.60},
-    "vendor_gstin": {"value": "06AABCX9876P1ZQ", "confidence": 0.72},
+    "vendor_tax_id": {"value": "06AABCX9876P1ZQ", "confidence": 0.72},
+    "vendor_tax_id_type": "GSTIN",
     "currency": "INR",
     "total_amount": 5900.00,
     "line_items": [
@@ -84,11 +87,12 @@
   },
 
   "interstate_invoice": {
-    "_comment": "Vendor state (33-TN) != company state (29-KA) — should resolve to IGST",
+    "_comment": "Vendor region (33) != company region (29) — should resolve to INTER_REGION tax scope",
     "invoice_number": "INV-2025-0455",
     "invoice_date": "2025-10-12",
     "vendor_name": {"value": "Chennai Auto Parts Ltd", "confidence": 0.91},
-    "vendor_gstin": {"value": "33AABCC5678D1ZR", "confidence": 0.93},
+    "vendor_tax_id": {"value": "33AABCC5678D1ZR", "confidence": 0.93},
+    "vendor_tax_id_type": "GSTIN",
     "currency": "INR",
     "total_amount": 177000.00,
     "line_items": [
@@ -113,12 +117,12 @@
     ]
   },
 
-  "no_gstin_invoice": {
-    "_comment": "No GSTIN at all — vendor resolution purely semantic, no state-code boost/penalty",
+  "no_tax_id_invoice": {
+    "_comment": "No tax ID at all — vendor resolution purely semantic, no region boost/penalty",
     "invoice_number": "INV-2025-0512",
     "invoice_date": "2025-11-01",
     "vendor_name": {"value": "Kumar Hardware Store", "confidence": 0.88},
-    "vendor_gstin": null,
+    "vendor_tax_id": null,
     "currency": "INR",
     "total_amount": 8260.00,
     "line_items": [

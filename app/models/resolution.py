@@ -57,9 +57,13 @@ class InvoiceContext(BaseModel):
 
     vendor_known: bool = False
     vendor_erp_id: Any | None = None
+    tax_scope: str | None = Field(
+        None,
+        description="INTRA_REGION, INTER_REGION, or IMPORT — derived from country/region comparison",
+    )
     tax_component: str | None = Field(
         None,
-        description="IGST or CGST_SGST, derived from state comparison",
+        description="ERP-specific tax component filter value (mapped from tax_scope via ERP schema)",
     )
     item_group_filter: str | None = Field(
         None,
@@ -76,9 +80,9 @@ class InvoiceContext(BaseModel):
             "Each dict has: item_erp_id, item_code, hsn_code, description, frequency."
         ),
     )
-    verified_gstin: str | None = Field(
+    verified_tax_id: str | None = Field(
         None,
-        description="Human-verified GSTIN from feedback loop",
+        description="Human-verified tax ID from feedback loop",
     )
 
 
