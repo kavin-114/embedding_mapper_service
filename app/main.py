@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import get_settings
 from app.logging_config import setup_logging
 from app.middleware import RequestContextMiddleware
-from app.routers import extractor_map, feedback, health, map, pull_sync, review, sync
+from app.routers import backtest, extractor_map, feedback, health, map, pull_sync, review, sync
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -31,6 +31,7 @@ def create_app() -> FastAPI:
     app.include_router(feedback.router)
     app.include_router(extractor_map.router)
     app.include_router(review.router)
+    app.include_router(backtest.router)
 
     if STATIC_DIR.is_dir():
         app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
