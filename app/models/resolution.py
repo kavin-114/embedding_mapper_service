@@ -84,6 +84,26 @@ class InvoiceContext(BaseModel):
         None,
         description="Human-verified tax ID from feedback loop",
     )
+    company_erp_id: str | None = Field(
+        None,
+        description="Resolved company ERP ID",
+    )
+    default_cost_center: str | None = Field(
+        None,
+        description="Default cost center from company metadata",
+    )
+    default_expense_account: str | None = Field(
+        None,
+        description="Default expense account from company metadata",
+    )
+    default_warehouse: str | None = Field(
+        None,
+        description="Default warehouse for the company",
+    )
+    default_payable_account: str | None = Field(
+        None,
+        description="Default payable (credit_to) account from company",
+    )
 
 
 class ResolvedLineItem(BaseModel):

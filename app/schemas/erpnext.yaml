@@ -7,6 +7,13 @@ field_map:
   vendor_name: supplier
   currency: currency
   total_amount: grand_total
+  company: company
+  supplier_address: supplier_address
+  shipping_address: shipping_address
+  billing_address: billing_address
+  cost_center: cost_center
+  taxes_and_charges: taxes_and_charges
+  credit_to: credit_to
 
 line_items_key: items
 
@@ -16,6 +23,9 @@ line_item_map:
   unit_price: rate
   uom: uom
   tax_rate: item_tax_template
+  warehouse: warehouse
+  expense_account: expense_account
+  cost_center: cost_center
 
 fk_fields:
   vendor_name:
@@ -57,8 +67,66 @@ fk_fields:
       - component
       - active
 
+  company:
+    collection: companies
+    hard_key:
+      metadata_field: company_name
+      source_field: company
+    filters: []
+
+  supplier_address:
+    collection: addresses
+    hard_key:
+      metadata_field: link_supplier
+      source_field: vendor_name
+    filters:
+      - address_type
+
+  shipping_address:
+    collection: addresses
+    hard_key:
+      metadata_field: link_supplier
+      source_field: vendor_name
+    filters:
+      - is_shipping_address
+
+  billing_address:
+    collection: addresses
+    hard_key:
+      metadata_field: link_company
+      source_field: company
+    filters:
+      - address_type
+
+  cost_center:
+    collection: cost_centers
+    hard_key:
+      metadata_field: cost_center_name
+      source_field: cost_center
+    filters:
+      - company
+      - is_group
+
+  warehouse:
+    collection: warehouses
+    hard_key:
+      metadata_field: warehouse_name
+      source_field: warehouse
+    filters:
+      - company
+      - is_group
+
+  taxes_and_charges:
+    collection: tax_templates
+    hard_key:
+      metadata_field: title
+      source_field: taxes_and_charges
+    filters:
+      - company
+
 # Generic tax scope → ERP-specific component mapping
+# Oman: single VAT regime (no intra/inter distinction like India GST)
 tax_scope_map:
-  INTRA_REGION: CGST_SGST
-  INTER_REGION: IGST
-  IMPORT: IGST
+  INTRA_REGION: VAT
+  INTER_REGION: VAT
+  IMPORT: VAT
