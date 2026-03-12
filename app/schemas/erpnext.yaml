@@ -18,7 +18,8 @@ field_map:
 line_items_key: items
 
 line_item_map:
-  description: item_name
+  description: item_code
+  item_name: item_name
   quantity: qty
   unit_price: rate
   uom: uom

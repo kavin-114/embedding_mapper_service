@@ -13,3 +13,4 @@ build/
 .claude/
 data/
 .venv/
+reports/

@@ -219,7 +219,8 @@
 <script>
 // ── Config persistence ────────────────────────────────────
 
-const CFG_FIELDS = ['cfgTenant','cfgErp','cfgUrl','cfgKey','cfgSecret','cfgLimit','cfgInvDir','cfgFormat','cfgInvMap'];
+// Fields persisted to localStorage (exclude sensitive credentials)
+const CFG_FIELDS = ['cfgTenant','cfgErp','cfgUrl','cfgLimit','cfgInvDir','cfgFormat','cfgInvMap'];
 
 function saveConfig() {
   const cfg = {};
@@ -234,7 +235,40 @@ function loadConfig() {
   } catch {}
 }
 
+async function loadServerDefaults() {
+  try {
+    const resp = await fetch('/api/v1/backtest/config');
+    if (!resp.ok) return;
+    const defaults = await resp.json();
+    // Set URL and dir as values (not sensitive)
+    const valueFields = { cfgUrl: defaults.erpnext_url, cfgInvDir: defaults.review_files_dir };
+    for (const [id, val] of Object.entries(valueFields)) {
+      const el = document.getElementById(id);
+      if (el && !el.value && val) el.value = val;
+    }
+    // Show masked key/secret as placeholders only — send empty so backend uses .env
+    const placeholderFields = { cfgKey: defaults.erpnext_api_key, cfgSecret: defaults.erpnext_api_secret };
+    for (const [id, val] of Object.entries(placeholderFields)) {
+      const el = document.getElementById(id);
+      if (el && !el.value && val) el.placeholder = val;
+    }
+  } catch {}
+}
+
 loadConfig();
+// Clean up any stale masked credentials from older localStorage entries
+try {
+  const raw = localStorage.getItem('backtest_config');
+  if (raw) {
+    const cfg = JSON.parse(raw);
+    if (cfg.cfgKey || cfg.cfgSecret) {
+      delete cfg.cfgKey;
+      delete cfg.cfgSecret;
+      localStorage.setItem('backtest_config', JSON.stringify(cfg));
+    }
+  }
+} catch {}
+loadServerDefaults();
 
 // ── Card toggle ───────────────────────────────────────────
 

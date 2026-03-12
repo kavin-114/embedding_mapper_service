@@ -261,6 +261,7 @@ class MapperService:
 
             raw_data: dict[str, Any] = {
                 "description": str(li.description.value),
+                "item_name": str(li.description.value),
                 "quantity": li.quantity,
                 "unit_price": li.unit_price,
             }

@@ -10,7 +10,7 @@ Frappe list API defaults:
 
 from __future__ import annotations
 
-import json as _json
+import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 from urllib.parse import quote
@@ -60,7 +60,7 @@ class ERPNextClient:
         if fields:
             params["fields"] = '["' + '","'.join(fields) + '"]'
         if filters:
-            params["filters"] = _json.dumps(filters)
+            params["filters"] = json.dumps(filters)
         data = self._get(f"/api/resource/{doctype}", params)
         return data.get("data", [])
 

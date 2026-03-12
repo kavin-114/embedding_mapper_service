@@ -16,13 +16,13 @@ from scripts.backtest.evaluator import (
     BacktestResult, Evaluator, FieldResult, InvoiceResult,
     _normalize_uom,
 )
-from scripts.backtest.extractor import (
-    extract_ground_truth,
+from app.services.connectors.erpnext_extractors import (
     items_to_seed_records,
     suppliers_to_seed_records,
     tax_templates_to_seed_records,
     uoms_to_seed_records,
 )
+from scripts.backtest.extractor import extract_ground_truth
 from scripts.backtest.report import save_csv_report, save_json_report
 
 

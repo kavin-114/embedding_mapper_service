@@ -1,19 +1,4 @@
-"""Re-export extractor functions from the shared connectors module.
-
-Kept for backward compatibility with existing backtest scripts.
-"""
-
-from app.services.connectors.erpnext_extractors import (  # noqa: F401
-    addresses_to_seed_records,
-    companies_to_seed_records,
-    cost_centers_to_seed_records,
-    items_to_seed_records,
-    purchase_tax_templates_to_seed_records,
-    suppliers_to_seed_records,
-    tax_templates_to_seed_records,
-    uoms_to_seed_records,
-    warehouses_to_seed_records,
-)
+"""Ground truth extraction from ERPNext Purchase Invoices."""
 
 
 def extract_ground_truth(pi: dict) -> dict:

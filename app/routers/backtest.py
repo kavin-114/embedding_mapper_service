@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-import json as _json
+import json
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -50,7 +50,7 @@ class BacktestRunRequest(BaseModel):
 
 
 def _sse(data: dict[str, Any], event: str = "message") -> str:
-    return f"event: {event}\ndata: {_json.dumps(data)}\n\n"
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
 # ── Serve page ────────────────────────────────────────────
@@ -60,6 +60,31 @@ def _sse(data: dict[str, Any], event: str = "message") -> str:
 async def serve_backtest_page() -> FileResponse:
     html_path = STATIC_DIR / "backtest.html"
     return FileResponse(html_path, media_type="text/html")
+
+
+@router.get("/api/v1/backtest/config")
+async def get_backtest_config(
+    settings: Settings = Depends(get_settings),
+) -> dict[str, Any]:
+    """Return configured .env defaults for the backtest UI form.
+
+    API key and secret are masked — the backend falls back to .env
+    values when the form fields are empty, so the UI only needs to
+    indicate that credentials are configured.
+    """
+    def _mask(val: str) -> str:
+        if not val:
+            return ""
+        if len(val) <= 6:
+            return "*" * len(val)
+        return val[:3] + "*" * (len(val) - 6) + val[-3:]
+
+    return {
+        "erpnext_url": settings.erpnext_url,
+        "erpnext_api_key": _mask(settings.erpnext_api_key),
+        "erpnext_api_secret": _mask(settings.erpnext_api_secret),
+        "review_files_dir": settings.review_files_dir,
+    }
 
 
 # ── Seed endpoint (SSE) ──────────────────────────────────

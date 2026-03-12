@@ -226,6 +226,31 @@ function expandPanel(panelId) {
   document.getElementById(panelId).classList.remove('collapsed');
 }
 
+// ── Shared config (synced with backtest page via localStorage) ──
+
+function loadSharedConfig() {
+  try {
+    const cfg = JSON.parse(localStorage.getItem('backtest_config') || '{}');
+    if (cfg.cfgTenant) document.getElementById('tenantId').value = cfg.cfgTenant;
+    if (cfg.cfgErp) document.getElementById('erpSystem').value = cfg.cfgErp;
+  } catch {}
+}
+
+function saveSharedConfig() {
+  try {
+    const cfg = JSON.parse(localStorage.getItem('backtest_config') || '{}');
+    cfg.cfgTenant = document.getElementById('tenantId').value;
+    cfg.cfgErp = document.getElementById('erpSystem').value;
+    localStorage.setItem('backtest_config', JSON.stringify(cfg));
+  } catch {}
+}
+
+loadSharedConfig();
+
+// Save on change
+document.getElementById('tenantId').addEventListener('change', saveSharedConfig);
+document.getElementById('erpSystem').addEventListener('change', saveSharedConfig);
+
 // State
 let extractorData = null;
 let mapResponse = null;

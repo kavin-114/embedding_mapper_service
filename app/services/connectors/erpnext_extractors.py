@@ -90,6 +90,7 @@ def items_to_seed_records(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "erp_id": item.get("name", ""),
             "text": item.get("item_name", ""),
             "item_code": item.get("item_code") or item.get("name", ""),
+            "item_name": item.get("item_name", ""),
         }
         if item.get("description"):
             rec["description"] = item["description"]

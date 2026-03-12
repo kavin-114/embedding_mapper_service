@@ -393,11 +393,15 @@ class VectorService:
         erp_system: str,
         query_embedding: list[float],
         n_results: int = 3,
+        where: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         """Semantic search on vendor_context collection.
 
         Uses get_collection (not get_or_create) to avoid creating empty
         collections for tenants with no feedback history.
+
+        Args:
+            where: Optional metadata filter (e.g. {"vendor_erp_id": "SUP-001"})
 
         Returns same format as semantic_search():
           [{erp_id, metadata, distance, score}, ...]
@@ -412,10 +416,13 @@ class VectorService:
             return []
 
         try:
-            results = collection.query(
-                query_embeddings=[query_embedding],
-                n_results=n_results,
-            )
+            query_kwargs: dict[str, Any] = {
+                "query_embeddings": [query_embedding],
+                "n_results": n_results,
+            }
+            if where:
+                query_kwargs["where"] = where
+            results = collection.query(**query_kwargs)
         except Exception:
             return []
 

@@ -38,13 +38,11 @@ from app.services.embedding_service import EmbeddingService
 from app.services.extractor_adapter import adapt
 from app.services.mapper import MapperService
 from app.services.vector_service import VectorService
-from scripts.backtest.erpnext_client import ERPNextClient
-from scripts.backtest.evaluator import Evaluator, InvoiceResult
-from scripts.backtest.extractor import (
+from app.services.connectors.erpnext import ERPNextClient
+from app.services.connectors.erpnext_extractors import (
     addresses_to_seed_records,
     companies_to_seed_records,
     cost_centers_to_seed_records,
-    extract_ground_truth,
     items_to_seed_records,
     purchase_tax_templates_to_seed_records,
     suppliers_to_seed_records,
@@ -52,6 +50,8 @@ from scripts.backtest.extractor import (
     uoms_to_seed_records,
     warehouses_to_seed_records,
 )
+from scripts.backtest.evaluator import Evaluator, InvoiceResult
+from scripts.backtest.extractor import extract_ground_truth
 from scripts.backtest.report import print_summary, save_csv_report, save_json_report
 
 
