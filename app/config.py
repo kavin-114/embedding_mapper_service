@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     company_country: str = "IN"
     company_region_code: str = "29"  # Karnataka default
 
+    # --- Logging ---
+    log_format: str = "json"
+    log_level: str = "INFO"
+
     # --- Sync staleness ---
     sync_stale_hours: int = 6
 
