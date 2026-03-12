@@ -155,7 +155,7 @@ class MapperService:
 
         # Stage 4b — Resolve company, addresses, cost_center, warehouse, tax template
         company_match = self._resolver.resolve_company(
-            None, tenant_id, erp_system,
+            invoice.company_name, tenant_id, erp_system,
         )
         company_erp_id = str(company_match.erp_id) if company_match.erp_id else None
 

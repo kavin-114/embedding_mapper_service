@@ -188,12 +188,15 @@ class VectorService:
                         meta[k] = str(v)
             metadatas.append(meta)
 
-        collection.upsert(
-            ids=ids,
-            embeddings=embeddings,
-            metadatas=metadatas,
-            documents=documents,
-        )
+        # ChromaDB has a max batch size — upsert in chunks
+        batch_size = 5000
+        for i in range(0, len(ids), batch_size):
+            collection.upsert(
+                ids=ids[i:i + batch_size],
+                embeddings=embeddings[i:i + batch_size],
+                metadatas=metadatas[i:i + batch_size],
+                documents=documents[i:i + batch_size],
+            )
 
         # Record sync timestamp
         key = self.collection_name(entity, tenant_id, erp_system)
@@ -383,6 +386,59 @@ class VectorService:
         )
 
         return len(items)
+
+    def search_vendor_context(
+        self,
+        tenant_id: str,
+        erp_system: str,
+        query_embedding: list[float],
+        n_results: int = 3,
+    ) -> list[dict[str, Any]]:
+        """Semantic search on vendor_context collection.
+
+        Uses get_collection (not get_or_create) to avoid creating empty
+        collections for tenants with no feedback history.
+
+        Returns same format as semantic_search():
+          [{erp_id, metadata, distance, score}, ...]
+        """
+        coll_name = self.collection_name("vendor_context", tenant_id, erp_system)
+        try:
+            collection = self.client.get_collection(
+                name=coll_name,
+            )
+        except Exception:
+            logger.debug("vector.search_vendor_context.no_collection", collection=coll_name)
+            return []
+
+        try:
+            results = collection.query(
+                query_embeddings=[query_embedding],
+                n_results=n_results,
+            )
+        except Exception:
+            return []
+
+        if not results["ids"] or not results["ids"][0]:
+            return []
+
+        output = []
+        for i, doc_id in enumerate(results["ids"][0]):
+            dist = results["distances"][0][i]
+            meta = results["metadatas"][0][i]
+            output.append({
+                "erp_id": meta.get("erp_id", doc_id),
+                "metadata": meta,
+                "distance": dist,
+                "score": _DISTANCE_TO_SCORE(dist),
+            })
+
+        logger.debug(
+            "vector.search_vendor_context",
+            collection=coll_name,
+            results_count=len(output),
+        )
+        return output
 
     def get_vendor_context(
         self,

@@ -85,10 +85,50 @@ class Resolver:
             logger.debug("vendor.hard_match_miss", tax_id=str(tax_id_field.value))
             # hard key miss — fall through to semantic
 
-        # Step 2 — semantic search on vendor_name
+        # Compute embedding upfront — reused by context lookup and semantic search
         vendor_text = str(invoice.vendor_name.value)
         query_vec = self._embedding.encode([vendor_text])[0]
 
+        # Step 1.5 — context-assisted hard match via vendor_context
+        ctx_results = self._vector.search_vendor_context(
+            tenant_id=tenant_id,
+            erp_system=erp_system,
+            query_embedding=query_vec,
+            n_results=1,
+        )
+        if ctx_results:
+            ctx_top = ctx_results[0]
+            ctx_score = ctx_top["score"]
+            ctx_tax_id = ctx_top["metadata"].get("vendor_tax_id")
+            if ctx_score >= self._settings.context_match_threshold and ctx_tax_id:
+                logger.debug(
+                    "vendor.context_hard_match_attempt",
+                    ctx_score=ctx_score,
+                    ctx_tax_id=ctx_tax_id,
+                )
+                meta = self._vector.hard_match(
+                    entity="vendors",
+                    tenant_id=tenant_id,
+                    erp_system=erp_system,
+                    where={"tax_id": str(ctx_tax_id)},
+                )
+                if meta is not None:
+                    logger.debug(
+                        "vendor.context_hard_match_hit",
+                        erp_id=meta["erp_id"],
+                    )
+                    return (
+                        FKMatch(
+                            erp_id=meta["erp_id"],
+                            matched_on=f"context_tax_id={ctx_tax_id}",
+                            strategy=ResolutionStrategy.CONTEXT_HARD_KEY,
+                            confidence=1.0,
+                            candidates=[],
+                        ),
+                        VendorStatus.FOUND,
+                    )
+
+        # Step 2 — semantic search on vendor_name
         results = self._vector.semantic_search(
             entity="vendors",
             tenant_id=tenant_id,

@@ -86,7 +86,7 @@ def save_csv_report(result: BacktestResult, path: str) -> str:
     headers = [
         "invoice_number", "supplier", "field_name",
         "expected_erp_id", "actual_erp_id", "correct",
-        "confidence", "strategy", "status",
+        "confidence", "strategy", "status", "skipped",
     ]
 
     with open(out_path, "w", newline="") as f:

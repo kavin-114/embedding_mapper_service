@@ -17,6 +17,7 @@ class FieldResult:
     confidence: float = 0.0
     strategy: str | None = None
     status: str | None = None
+    skipped: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -27,6 +28,7 @@ class FieldResult:
             "confidence": self.confidence,
             "strategy": self.strategy,
             "status": self.status,
+            "skipped": self.skipped,
         }
 
 
@@ -40,10 +42,11 @@ class InvoiceResult:
 
     @property
     def accuracy(self) -> float:
-        if not self.field_results:
+        evaluated = [f for f in self.field_results if not f.skipped]
+        if not evaluated:
             return 0.0
-        correct = sum(1 for f in self.field_results if f.correct)
-        return correct / len(self.field_results)
+        correct = sum(1 for f in evaluated if f.correct)
+        return correct / len(evaluated)
 
     @property
     def overall_status(self) -> str:
@@ -74,7 +77,10 @@ class BacktestResult:
 
     @property
     def overall_accuracy(self) -> float:
-        all_fields = [f for inv in self.invoice_results for f in inv.field_results]
+        all_fields = [
+            f for inv in self.invoice_results
+            for f in inv.field_results if not f.skipped
+        ]
         if not all_fields:
             return 0.0
         return sum(1 for f in all_fields if f.correct) / len(all_fields)
@@ -85,6 +91,8 @@ class BacktestResult:
         groups: dict[str, list[FieldResult]] = {}
         for inv in self.invoice_results:
             for f in inv.field_results:
+                if f.skipped:
+                    continue
                 # Determine field type from field_name
                 if "vendor" in f.field_name:
                     ft = "vendor"
@@ -114,6 +122,8 @@ class BacktestResult:
         groups: dict[str, list[FieldResult]] = {}
         for inv in self.invoice_results:
             for f in inv.field_results:
+                if f.skipped:
+                    continue
                 status = f.status or "unknown"
                 groups.setdefault(status, []).append(f)
 
@@ -133,6 +143,8 @@ class BacktestResult:
         groups: dict[str, list[FieldResult]] = {}
         for inv in self.invoice_results:
             for f in inv.field_results:
+                if f.skipped:
+                    continue
                 strat = f.strategy or "none"
                 groups.setdefault(strat, []).append(f)
 
@@ -148,11 +160,11 @@ class BacktestResult:
 
     @property
     def failures(self) -> list[dict[str, Any]]:
-        """All incorrect field mappings."""
+        """All incorrect field mappings (excludes skipped)."""
         out = []
         for inv in self.invoice_results:
             for f in inv.field_results:
-                if not f.correct:
+                if not f.correct and not f.skipped:
                     out.append({
                         "invoice": inv.invoice_number,
                         **f.to_dict(),
@@ -169,6 +181,30 @@ class BacktestResult:
             "failures": self.failures,
             "invoices": [inv.to_dict() for inv in self.invoice_results],
         }
+
+
+_UOM_CANONICAL: dict[str, str] = {
+    "nos": "Nos", "each": "Nos", "numbers": "Nos", "number": "Nos",
+    "pcs": "Nos", "pieces": "Nos",
+    "kg": "Kg", "kgs": "Kg", "kilogram": "Kg",
+    "mtr": "Mtr", "meter": "Mtr", "metre": "Mtr",
+    "ltr": "Ltr", "litre": "Ltr", "liter": "Ltr",
+    "box": "Box", "boxes": "Box",
+    "set": "Set", "sets": "Set",
+    "pair": "Pair", "pairs": "Pair",
+}
+
+
+def _normalize_uom(value: str | None) -> str | None:
+    """Normalize a UOM string via the alias map."""
+    if value is None:
+        return None
+    return _UOM_CANONICAL.get(value.lower().strip(), value)
+
+
+def _is_empty(value: str | None) -> bool:
+    """Check if a ground truth value is empty/missing."""
+    return value is None or str(value).strip() == ""
 
 
 class Evaluator:
@@ -189,14 +225,17 @@ class Evaluator:
 
         # Vendor field
         vendor_mapping = mappings.get("vendor_name", {})
+        vendor_expected = ground_truth.get("vendor_erp_id", "")
+        vendor_skipped = _is_empty(vendor_expected)
         result.field_results.append(FieldResult(
             field_name="vendor_name",
-            expected_erp_id=ground_truth.get("vendor_erp_id", ""),
+            expected_erp_id=vendor_expected,
             actual_erp_id=vendor_mapping.get("erp_id"),
-            correct=vendor_mapping.get("erp_id") == ground_truth.get("vendor_erp_id"),
+            correct=vendor_skipped or vendor_mapping.get("erp_id") == vendor_expected,
             confidence=vendor_mapping.get("confidence", 0.0),
             strategy=vendor_mapping.get("strategy"),
             status=vendor_mapping.get("status"),
+            skipped=vendor_skipped,
         ))
 
         # Line item fields
@@ -207,40 +246,53 @@ class Evaluator:
             # Item (description)
             desc_key = f"{prefix}.description"
             desc_mapping = mappings.get(desc_key, {})
+            desc_expected = gt_item.get("item_code", "")
+            desc_skipped = _is_empty(desc_expected)
             result.field_results.append(FieldResult(
                 field_name=desc_key,
-                expected_erp_id=gt_item.get("item_code", ""),
+                expected_erp_id=desc_expected,
                 actual_erp_id=desc_mapping.get("erp_id"),
-                correct=desc_mapping.get("erp_id") == gt_item.get("item_code"),
+                correct=desc_skipped or desc_mapping.get("erp_id") == desc_expected,
                 confidence=desc_mapping.get("confidence", 0.0),
                 strategy=desc_mapping.get("strategy"),
                 status=desc_mapping.get("status"),
+                skipped=desc_skipped,
             ))
 
-            # UOM
+            # UOM (with alias normalization)
             uom_key = f"{prefix}.uom"
             uom_mapping = mappings.get(uom_key, {})
+            uom_expected = gt_item.get("uom", "")
+            uom_skipped = _is_empty(uom_expected)
+            uom_correct = uom_skipped or (
+                _normalize_uom(uom_mapping.get("erp_id"))
+                == _normalize_uom(uom_expected)
+            )
             result.field_results.append(FieldResult(
                 field_name=uom_key,
-                expected_erp_id=gt_item.get("uom", ""),
+                expected_erp_id=uom_expected,
                 actual_erp_id=uom_mapping.get("erp_id"),
-                correct=uom_mapping.get("erp_id") == gt_item.get("uom"),
+                correct=uom_correct,
                 confidence=uom_mapping.get("confidence", 0.0),
                 strategy=uom_mapping.get("strategy"),
                 status=uom_mapping.get("status"),
+                skipped=uom_skipped,
             ))
 
             # Tax template
             tax_key = f"{prefix}.tax_rate"
             tax_mapping = mappings.get(tax_key, {})
+            tax_expected = gt_item.get("tax_template", "")
+            tax_skipped = _is_empty(tax_expected)
             result.field_results.append(FieldResult(
                 field_name=tax_key,
-                expected_erp_id=gt_item.get("tax_template", ""),
+                expected_erp_id=tax_expected,
                 actual_erp_id=tax_mapping.get("erp_id"),
-                correct=tax_mapping.get("erp_id") == gt_item.get("tax_template"),
+                correct=tax_skipped or tax_mapping.get("erp_id") == tax_expected,
                 confidence=tax_mapping.get("confidence", 0.0),
                 strategy=tax_mapping.get("strategy"),
                 status=tax_mapping.get("status"),
+                skipped=tax_skipped,
             ))
 
         return result

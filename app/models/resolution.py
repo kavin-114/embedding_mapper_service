@@ -12,6 +12,7 @@ class ResolutionStrategy(str, Enum):
     """How an FK field was resolved."""
 
     HARD_KEY = "hard_key"
+    CONTEXT_HARD_KEY = "context_hard_key"
     FILTERED_SEMANTIC = "filtered_semantic"
     PURE_SEMANTIC = "pure_semantic"
     NOT_FOUND = "not_found"

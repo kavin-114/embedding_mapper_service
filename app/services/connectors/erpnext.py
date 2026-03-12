@@ -202,6 +202,21 @@ class ERPNextClient:
         """Fetch a single Purchase Invoice with items child table."""
         return self._get_doc("Purchase Invoice", name)
 
+    def get_purchase_invoice_by_bill_no(self, bill_no: str) -> dict[str, Any] | None:
+        """Look up a Purchase Invoice by supplier invoice number (bill_no).
+
+        Returns the full PI document if found, None otherwise.
+        """
+        summaries = self._list(
+            "Purchase Invoice",
+            fields=["name"],
+            filters={"bill_no": bill_no},
+            limit=1,
+        )
+        if not summaries:
+            return None
+        return self._get_doc("Purchase Invoice", summaries[0]["name"])
+
     def get_purchase_invoices(
         self,
         filters: dict[str, Any] | None = None,

@@ -13,7 +13,7 @@ Receives a canonical invoice JSON (extracted by vLLM document parser with per-fi
 
 ## Collection Naming Convention
 `{entity}__{tenant_id}__{erp_system}`
-Examples: `vendors__tenant_a__erpnext`, `items__tenant_b__odoo`
+Examples: `vendors__alfarsi__erpnext`, `items__tenant_b__odoo`
 
 Each collection stores one ERP native ID in metadata field `erp_id`. No cross-ERP IDs in the same record.
 
@@ -22,8 +22,13 @@ Each collection stores one ERP native ID in metadata field `erp_id`. No cross-ER
 |------------------|--------------------------------------------|
 | vendors          | ERP vendor/supplier master data             |
 | items            | ERP item/product master data                |
-| tax_codes        | ERP tax templates                           |
+| tax_codes        | ERP item tax templates                      |
 | uoms             | Units of measurement                        |
+| companies        | ERP company records                         |
+| addresses        | Supplier/company addresses                  |
+| cost_centers     | ERP cost centers                            |
+| warehouses       | ERP warehouses                              |
+| tax_templates    | Purchase taxes and charges templates        |
 | vendor_context   | Learned vendor→item mappings from feedback  |
 
 ## ScoredField Confidence → Strategy
@@ -105,30 +110,85 @@ ERP YAML `tax_scope_map` converts these to ERP-specific values (e.g., INTER_REGI
 
 ## API Endpoints
 - `POST /api/v1/map` — Map canonical invoice to ERP payload (headers: X-ERP-System, X-Tenant-ID)
+- `POST /api/v1/map/extractor` — Map extractor-format invoice (auto-adapts to canonical first)
 - `POST /api/v1/sync` — Seed/update a collection from ERP master data
+- `POST /api/v1/pull-sync` — Pull-sync master data from ERPNext directly
 - `POST /api/v1/feedback` — Store human-approved vendor→item mappings for learning
 - `GET  /api/v1/health` — Liveness probe
 - `GET  /api/v1/health/ready` — Readiness probe (checks ChromaDB)
+- `GET  /review` — Invoice review UI (single invoice, 4-panel view)
+- `GET  /api/v1/review/files` — List extractor JSON files from server directory
+- `GET  /api/v1/review/file` — Read an extractor JSON file (path-traversal protected)
+- `GET  /api/v1/review/ground-truth` — Fetch ground truth from ERPNext by bill_no
+
+## Review UI (`/review`)
+Single-page HTML app for e2e testing and feedback submission. Four collapsible panels:
+1. **Original Document** — PDF/image viewer (collapsed by default)
+2. **Extracted** — Extractor output fields with confidence color coding (collapsed by default)
+3. **Mapped** — Pipeline results with status badges, inline-editable erp_ids (expanded by default)
+4. **Ground Truth** — Auto-fetched from ERPNext by bill_no or paste frm.doc JSON (expanded by default)
+
+Color coding: green (>=0.88 auto_map / >=90 confidence), amber (0.70-0.87 suggest / 70-89), orange (0.50-0.69 review / 50-69), red (<0.50 no_match / <50).
+
+"Approve & Submit Feedback" button calls POST /api/v1/feedback to close the learning loop.
+
+## Extractor Adapter
+`app/services/extractor_adapter.py` converts ExtractorInvoice (vLLM format, confidence 0-100) to CanonicalInvoice (confidence 0.0-1.0). Handles field renaming, tax ID priority (GSTIN > VAT > tax_id > PAN), date parsing, and document-level tax distribution to line items.
+
+## Backtest CLI
+`python -m scripts.backtest.run` — batch-test mapper accuracy against ERPNext Purchase Invoices.
+
+```bash
+python -m scripts.backtest.run \
+    --tenant-id alfarsi --erp-system erpnext \
+    --invoices-dir ./extractor_outputs/ \
+    --format extractor \
+    --invoice-map data/file_to_invoice_map.json \
+    --seed \
+    --output reports/backtest_results
+```
+
+Steps: seed ChromaDB from ERPNext → load invoices → map each → fetch ground truth PIs → evaluate accuracy → generate JSON+CSV reports.
+
+## ERPNext Connector
+`app/services/connectors/erpnext.py` — Frappe REST API client with concurrent fetching (ThreadPoolExecutor). Used by pull-sync, backtest, and review ground-truth endpoints. Auth: `token api_key:api_secret`.
 
 ## Running
 ```bash
 # Start ChromaDB
 chroma run --host localhost --port 8000 --path ./chroma_data
 
-# Seed master data
-python scripts/seed.py
-
 # Start API
 uvicorn app.main:app --reload --port 8080
+
+# Open review UI
+open http://localhost:8080/review
 
 # Tests
 pytest
 ```
 
+## Configuration (`.env`)
+```
+ERPNEXT_URL=https://site.erpnext.com
+ERPNEXT_API_KEY=<key>
+ERPNEXT_API_SECRET=<secret>
+CHROMA_HOST=localhost
+CHROMA_PORT=8000
+COMPANY_COUNTRY=OM
+COMPANY_REGION_CODE=
+REVIEW_FILES_DIR=/path/to/extractor/outputs
+LOG_FORMAT=console
+LOG_LEVEL=INFO
+```
+
 ## Key Files
-- `app/models/` — Pydantic models (canonical.py, resolution.py, response.py, feedback.py)
+- `app/models/` — Pydantic models (canonical.py, resolution.py, response.py, feedback.py, extractor.py)
 - `app/schemas/` — ERP YAML configs (erpnext.yaml, odoo.yaml, zoho.yaml)
-- `app/services/` — Business logic (resolver, mapper, transformer, context_builder, etc.)
-- `app/routers/` — FastAPI route handlers (map, sync, feedback, health)
+- `app/services/` — Business logic (resolver, mapper, transformer, context_builder, extractor_adapter, vector_service, embedding_service)
+- `app/services/connectors/` — ERPNext client + extractors (seed format converters)
+- `app/routers/` — FastAPI route handlers (map, extractor_map, sync, pull_sync, feedback, review, health)
+- `app/static/` — Review UI (review.html)
 - `app/config.py` — Settings from environment
-- `scripts/` — Seed scripts and master data fixtures
+- `scripts/backtest/` — Backtest CLI (run.py, evaluator.py, extractor.py, report.py, erpnext_client.py)
+- `tests/` — pytest test suite (164 tests)

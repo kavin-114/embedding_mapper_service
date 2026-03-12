@@ -12,7 +12,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.services.connectors.erpnext import ERPNextClient
-from scripts.backtest.evaluator import BacktestResult, Evaluator, FieldResult, InvoiceResult
+from scripts.backtest.evaluator import (
+    BacktestResult, Evaluator, FieldResult, InvoiceResult,
+    _normalize_uom,
+)
 from scripts.backtest.extractor import (
     extract_ground_truth,
     items_to_seed_records,
@@ -283,6 +286,83 @@ class TestEvaluator:
         assert batch.by_field_type["vendor"]["accuracy"] == 0.5
         assert "hard_key" in batch.by_strategy
         assert "pure_semantic" in batch.by_strategy
+
+    def test_empty_ground_truth_skipped(self):
+        """Fields with empty expected values are skipped, not penalized."""
+        response_items = [{"item_code": "I1", "uom": "Kg", "tax_template": "VAT 5%"}]
+        gt_items = [{"item_code": "I1", "uom": "Kg", "tax_template": ""}]
+        response = self._make_map_response(items=response_items)
+        gt = self._make_ground_truth(items=gt_items)
+
+        evaluator = Evaluator()
+        result = evaluator.evaluate_invoice(response, gt, "INV-SKIP")
+
+        # tax_template is empty → skipped; vendor + item + uom all correct → 3/3
+        assert result.accuracy == 1.0
+        tax_field = [f for f in result.field_results if "tax" in f.field_name][0]
+        assert tax_field.skipped is True
+
+    def test_none_ground_truth_skipped(self):
+        """None ground truth values are also skipped."""
+        response_items = [{"item_code": "I1", "uom": "Kg", "tax_template": "T1"}]
+        gt_items = [{"item_code": "I1", "uom": "Kg"}]  # no tax_template key
+        response = self._make_map_response(items=response_items)
+        gt = self._make_ground_truth(items=gt_items)
+
+        evaluator = Evaluator()
+        result = evaluator.evaluate_invoice(response, gt, "INV-NONE")
+
+        assert result.accuracy == 1.0
+
+    def test_uom_alias_normalization(self):
+        """Each and Nos should be treated as equivalent."""
+        response_items = [{"item_code": "I1", "uom": "Nos", "tax_template": "T1"}]
+        gt_items = [{"item_code": "I1", "uom": "Each", "tax_template": "T1"}]
+        response = self._make_map_response(items=response_items)
+        gt = self._make_ground_truth(items=gt_items)
+
+        evaluator = Evaluator()
+        result = evaluator.evaluate_invoice(response, gt, "INV-UOM")
+
+        uom_field = [f for f in result.field_results if "uom" in f.field_name][0]
+        assert uom_field.correct is True
+        assert result.accuracy == 1.0
+
+    def test_skipped_excluded_from_batch_aggregations(self):
+        """Skipped fields don't appear in batch breakdowns."""
+        inv = InvoiceResult(
+            invoice_number="INV-001",
+            supplier="Test",
+            field_results=[
+                FieldResult("vendor_name", "V1", "V1", True, 1.0, "hard_key", "auto_map"),
+                FieldResult("line_items[0].tax_rate", "", "T1", True, 0.9, "semantic", "auto_map", skipped=True),
+            ],
+        )
+        evaluator = Evaluator()
+        batch = evaluator.evaluate_batch([inv])
+
+        assert batch.overall_accuracy == 1.0
+        assert "tax" not in batch.by_field_type
+        assert len(batch.failures) == 0
+
+
+class TestUomNormalize:
+    def test_each_to_nos(self):
+        assert _normalize_uom("Each") == "Nos"
+        assert _normalize_uom("each") == "Nos"
+
+    def test_nos_stays(self):
+        assert _normalize_uom("Nos") == "Nos"
+
+    def test_kg_variants(self):
+        assert _normalize_uom("kgs") == "Kg"
+        assert _normalize_uom("Kilogram") == "Kg"
+
+    def test_unknown_passthrough(self):
+        assert _normalize_uom("CustomUnit") == "CustomUnit"
+
+    def test_none_passthrough(self):
+        assert _normalize_uom(None) is None
 
 
 # ── Report tests ─────────────────────────────────────────────────────

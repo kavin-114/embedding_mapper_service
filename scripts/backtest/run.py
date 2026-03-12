@@ -1,6 +1,6 @@
 """CLI entry point for ERPNext backtesting.
 
-Usage:
+Usage (canonical format — existing):
     python -m scripts.backtest.run \
         --url https://site.erpnext.com \
         --api-key <key> --api-secret <secret> \
@@ -9,6 +9,16 @@ Usage:
         --seed \
         --limit 50 \
         --output reports/backtest_results
+
+Usage (extractor format — new):
+    python -m scripts.backtest.run \
+        --url https://site.erpnext.com \
+        --api-key <key> --api-secret <secret> \
+        --tenant-id tenant_a --erp-system erpnext \
+        --invoices-dir ./extractor_outputs/ \
+        --format extractor \
+        --seed \
+        --output reports/backtest_extractor
 """
 
 from __future__ import annotations
@@ -23,7 +33,9 @@ from typing import Any
 
 from app.config import Settings
 from app.models.canonical import CanonicalInvoice
+from app.models.extractor import ExtractorInvoice
 from app.services.embedding_service import EmbeddingService
+from app.services.extractor_adapter import adapt
 from app.services.mapper import MapperService
 from app.services.vector_service import VectorService
 from scripts.backtest.erpnext_client import ERPNextClient
@@ -60,7 +72,15 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--api-secret", default=os.getenv("ERPNEXT_API_SECRET"), help="API secret")
     parser.add_argument("--tenant-id", required=True, help="Tenant ID for collection naming")
     parser.add_argument("--erp-system", default="erpnext", help="ERP system name")
-    parser.add_argument("--invoices-dir", default=None, help="Directory of vLLM canonical JSON files")
+    parser.add_argument("--invoices-dir", default=None, help="Directory of invoice JSON files")
+    parser.add_argument(
+        "--format", choices=["canonical", "extractor"], default="canonical",
+        help="Input format: 'canonical' (default) or 'extractor' (vLLM extractor output)",
+    )
+    parser.add_argument(
+        "--invoice-map", default=None,
+        help="Path to file_to_invoice_map.json (for extractor format, maps filenames to PI names)",
+    )
     parser.add_argument("--seed", action="store_true", help="Seed ChromaDB from ERPNext master data")
     parser.add_argument("--seed-only", action="store_true", help="Seed ChromaDB and exit (no backtest)")
     parser.add_argument("--limit", type=int, default=0, help="Limit master data records fetched")
@@ -155,6 +175,86 @@ def _load_canonical_invoices(invoices_dir: str) -> list[CanonicalInvoice]:
     return invoices
 
 
+def _load_invoice_map(map_path: str | None) -> dict[str, str]:
+    """Load the file_to_invoice_map.json, returning filename→PI name dict.
+
+    Tries common image/PDF extensions when looking up a stem.
+    """
+    if not map_path:
+        default = Path("data/file_to_invoice_map.json")
+        if default.exists():
+            map_path = str(default)
+        else:
+            return {}
+
+    with open(map_path) as f:
+        data = json.load(f)
+    return data.get("file_to_invoice", {})
+
+
+def _resolve_pi_name(stem: str, invoice_map: dict[str, str]) -> str | None:
+    """Find the PI name for an extractor output file stem.
+
+    The map keys are source filenames (e.g. 'abc-123.jpg'), while our
+    extractor outputs are named 'abc-123.json'.  Try common extensions.
+    """
+    for ext in [".jpg", ".jpeg", ".png", ".pdf", ".tiff", ".bmp"]:
+        key = stem + ext
+        if key in invoice_map:
+            return invoice_map[key]
+    # Also try stem directly (no extension)
+    return invoice_map.get(stem)
+
+
+def _load_extractor_invoices(
+    invoices_dir: str,
+    invoice_map: dict[str, str],
+) -> list[tuple[CanonicalInvoice, str]]:
+    """Load extractor-format JSON files, adapt to canonical, and resolve PI names.
+
+    Returns list of (canonical_invoice, pi_name) tuples.
+    """
+    path = Path(invoices_dir)
+    if not path.is_dir():
+        print(f"Error: {invoices_dir} is not a directory")
+        sys.exit(1)
+
+    results: list[tuple[CanonicalInvoice, str]] = []
+    skipped = 0
+    for f in sorted(path.glob("*.json")):
+        pi_name = _resolve_pi_name(f.stem, invoice_map)
+        if not pi_name:
+            print(f"  Warning: no PI mapping for {f.name}, skipping")
+            skipped += 1
+            continue
+
+        with open(f) as fp:
+            data = json.load(fp)
+        ext = ExtractorInvoice(**data)
+        canonical = adapt(ext)
+        results.append((canonical, pi_name))
+
+    if not results:
+        print(f"No mapped JSON files found in {invoices_dir} (skipped {skipped})")
+        sys.exit(1)
+
+    print(f"Loaded {len(results)} extractor invoices (adapted to canonical, {skipped} unmapped)")
+    return results
+
+
+def _fetch_ground_truth(
+    erp_client: ERPNextClient,
+    pi_name: str,
+) -> dict[str, Any] | None:
+    """Fetch a Purchase Invoice by name and extract ground truth."""
+    try:
+        pi = erp_client.get_purchase_invoice(pi_name)
+        return extract_ground_truth(pi)
+    except Exception as e:
+        print(f"  Skipping {pi_name}: could not fetch PI ({e})")
+        return None
+
+
 def main() -> None:
     args = _parse_args()
 
@@ -170,6 +270,7 @@ def main() -> None:
     erp_client = ERPNextClient(args.url, args.api_key, args.api_secret)
     evaluator = Evaluator()
     options = _MapOptions()
+    is_extractor = args.format == "extractor"
 
     # Step 1: Optionally seed ChromaDB
     if args.seed or args.seed_only:
@@ -182,25 +283,34 @@ def main() -> None:
             print("\nSeeding complete.")
             return
 
-    # Step 2: Load canonical invoices
+    # Step 2: Load invoices
     if not args.invoices_dir:
         print("Error: --invoices-dir is required for backtest (or use --seed-only)")
         sys.exit(1)
 
-    print("\n--- Loading canonical invoices ---")
-    invoices = _load_canonical_invoices(args.invoices_dir)
+    if is_extractor:
+        print("\n--- Loading extractor invoices ---")
+        invoice_map = _load_invoice_map(args.invoice_map)
+        if not invoice_map:
+            print("Error: --invoice-map required for extractor format (or place data/file_to_invoice_map.json)")
+            sys.exit(1)
+        extractor_pairs = _load_extractor_invoices(args.invoices_dir, invoice_map)
+        # Convert to list of (invoice, pi_name) for unified processing
+        invoice_pi_pairs: list[tuple[CanonicalInvoice, str]] = extractor_pairs
+    else:
+        print("\n--- Loading canonical invoices ---")
+        canonical_invoices = _load_canonical_invoices(args.invoices_dir)
+        # For canonical, PI name = invoice_number
+        invoice_pi_pairs = [(inv, inv.invoice_number) for inv in canonical_invoices]
 
     # Step 3: Run each invoice through mapper + evaluate
     print("\n--- Running backtest ---")
     invoice_results: list[InvoiceResult] = []
 
-    for inv in invoices:
+    for inv, pi_name in invoice_pi_pairs:
         # Look up matching Purchase Invoice in ERPNext
-        try:
-            pi = erp_client.get_purchase_invoice(inv.invoice_number)
-            ground_truth = extract_ground_truth(pi)
-        except Exception as e:
-            print(f"  Skipping {inv.invoice_number}: could not fetch PI ({e})")
+        ground_truth = _fetch_ground_truth(erp_client, pi_name)
+        if ground_truth is None:
             continue
 
         # Run through mapper
@@ -212,12 +322,13 @@ def main() -> None:
             continue
 
         # Evaluate
+        label = f"{inv.invoice_number} ({pi_name})" if pi_name != inv.invoice_number else inv.invoice_number
         inv_result = evaluator.evaluate_invoice(
-            response_dict, ground_truth, inv.invoice_number,
+            response_dict, ground_truth, label,
         )
         invoice_results.append(inv_result)
         status_icon = "+" if inv_result.accuracy >= 0.8 else "-"
-        print(f"  [{status_icon}] {inv.invoice_number}: {inv_result.accuracy:.0%}")
+        print(f"  [{status_icon}] {label}: {inv_result.accuracy:.0%}")
 
     if not invoice_results:
         print("No invoices were successfully evaluated.")

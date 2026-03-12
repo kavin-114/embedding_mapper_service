@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     log_format: str = "json"
     log_level: str = "INFO"
 
+    # --- ERPNext connection (for review ground truth) ---
+    erpnext_url: str = ""
+    erpnext_api_key: str = ""
+    erpnext_api_secret: str = ""
+
+    # --- Review UI ---
+    review_files_dir: str = ""
+
     # --- Sync staleness ---
     sync_stale_hours: int = 6
 
@@ -46,6 +54,8 @@ class Settings(BaseSettings):
     hard_key_threshold: float = 0.90
     filter_threshold: float = 0.70
     hint_threshold: float = 0.50
+
+    context_match_threshold: float = 0.75
 
     auto_map_threshold: float = 0.88
     suggest_threshold: float = 0.70
