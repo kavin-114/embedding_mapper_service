@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invoice Review — Embedding Mapper</title>
+<style>
+  :root {
+    --green: #22c55e; --green-bg: #f0fdf4; --green-border: #86efac;
+    --amber: #f59e0b; --amber-bg: #fffbeb; --amber-border: #fcd34d;
+    --orange: #f97316; --orange-bg: #fff7ed; --orange-border: #fdba74;
+    --red: #ef4444; --red-bg: #fef2f2; --red-border: #fca5a5;
+    --gray: #6b7280; --bg: #f9fafb; --card-bg: #ffffff;
+    --border: #e5e7eb; --text: #111827; --text-muted: #6b7280;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+  /* Header */
+  .header { background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; position: sticky; top: 0; z-index: 10; }
+  .header label { font-weight: 600; font-size: 12px; color: var(--text-muted); }
+  .header input[type="text"] { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; width: 120px; }
+  .header button { padding: 6px 16px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .btn-primary { background: #3b82f6; color: white; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+  .btn-success { background: var(--green); color: white; }
+  .btn-success:hover { background: #16a34a; }
+  .btn-secondary { background: #e5e7eb; color: var(--text); }
+  .btn-secondary:hover { background: #d1d5db; }
+  .file-input { font-size: 12px; }
+  .logo { font-weight: 700; font-size: 16px; color: #3b82f6; margin-right: 8px; }
+
+  /* Panels — vertical collapsible layout */
+  .panels { padding: 12px 20px; }
+  .panels > .panel + .panel { margin-top: 8px; }
+  .panel { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; }
+  .panel-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; cursor: pointer; user-select: none; border-radius: 8px; }
+  .panel-header:hover { background: #f3f4f6; }
+  .panel-title { font-weight: 700; font-size: 13px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; margin: 0; padding: 0; border: none; }
+  .panel-toggle { font-size: 18px; color: var(--text-muted); transition: transform 0.2s; }
+  .panel.collapsed .panel-toggle { transform: rotate(-90deg); }
+  .panel-body { padding: 0 16px 16px; }
+  .panel.collapsed .panel-body { display: none; }
+
+  /* Document viewer */
+  .doc-viewer { width: 100%; min-height: 400px; border: 1px solid var(--border); border-radius: 8px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+  .doc-viewer embed, .doc-viewer img { width: 100%; min-height: 400px; object-fit: contain; border-radius: 8px; }
+
+  /* Field tables */
+  .field-table { width: 100%; border-collapse: collapse; }
+  .field-table th { text-align: left; font-size: 11px; font-weight: 600; color: var(--text-muted); padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  .field-table td { padding: 6px 8px; border-bottom: 1px solid #f3f4f6; font-size: 13px; vertical-align: top; }
+  .field-table tr:hover { background: #f9fafb; }
+  .field-label { font-weight: 600; color: var(--text-muted); font-size: 12px; white-space: nowrap; }
+  .field-value { word-break: break-word; }
+  .section-header { font-weight: 700; font-size: 12px; color: var(--text); background: #f3f4f6; padding: 8px; margin-top: 12px; border-radius: 4px; }
+
+  /* Confidence badges */
+  .conf-badge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 11px; font-weight: 600; margin-left: 4px; }
+  .conf-high { background: var(--green-bg); color: #15803d; border: 1px solid var(--green-border); }
+  .conf-med { background: var(--amber-bg); color: #92400e; border: 1px solid var(--amber-border); }
+  .conf-low { background: var(--orange-bg); color: #9a3412; border: 1px solid var(--orange-border); }
+  .conf-none { background: var(--red-bg); color: #991b1b; border: 1px solid var(--red-border); }
+
+  /* Status badges */
+  .status-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+  .status-auto_map { background: var(--green-bg); color: #15803d; border: 1px solid var(--green-border); }
+  .status-suggest { background: var(--amber-bg); color: #92400e; border: 1px solid var(--amber-border); }
+  .status-review { background: var(--orange-bg); color: #9a3412; border: 1px solid var(--orange-border); }
+  .status-no_match { background: var(--red-bg); color: #991b1b; border: 1px solid var(--red-border); }
+
+  .strategy-badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; background: #e5e7eb; color: var(--text-muted); margin-left: 4px; }
+
+  /* Mapped field row highlight */
+  .mapped-auto_map { border-left: 3px solid var(--green); }
+  .mapped-suggest { border-left: 3px solid var(--amber); }
+  .mapped-review { border-left: 3px solid var(--orange); }
+  .mapped-no_match { border-left: 3px solid var(--red); }
+
+  /* Editable fields */
+  .editable { border: 1px dashed var(--border); padding: 2px 4px; border-radius: 4px; min-width: 60px; cursor: text; }
+  .editable:focus { outline: 2px solid #3b82f6; border-color: transparent; }
+
+  /* Footer */
+  .footer { background: var(--card-bg); border-top: 1px solid var(--border); padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; bottom: 0; z-index: 10; }
+  .overall-status { font-weight: 700; font-size: 14px; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: white; border-radius: 12px; padding: 24px; max-width: 500px; width: 90%; max-height: 70vh; overflow-y: auto; }
+  .modal h3 { margin-bottom: 12px; }
+  .modal .file-list { list-style: none; }
+  .modal .file-list li { padding: 8px 12px; border-bottom: 1px solid var(--border); cursor: pointer; border-radius: 4px; }
+  .modal .file-list li:hover { background: #f3f4f6; }
+  .modal .file-list .fname { font-weight: 600; }
+  .modal .file-list .fmeta { font-size: 11px; color: var(--text-muted); }
+
+  /* GT paste area */
+  .gt-paste { width: 100%; min-height: 80px; border: 1px dashed var(--border); border-radius: 8px; padding: 8px; font-family: monospace; font-size: 12px; resize: vertical; margin-bottom: 8px; }
+
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+  .empty-state p { margin-top: 8px; font-size: 13px; }
+
+  .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; color: white; font-weight: 600; font-size: 13px; z-index: 200; display: none; }
+  .toast.success { background: var(--green); display: block; }
+  .toast.error { background: var(--red); display: block; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="logo">Invoice Review</span>
+  <a href="/backtest" style="font-size:13px;color:var(--text-muted);text-decoration:none;margin-right:8px">Backtest</a>
+  <div>
+    <label>Tenant</label>
+    <input type="text" id="tenantId" value="alfarsi" placeholder="tenant_id">
+  </div>
+  <div>
+    <label>ERP</label>
+    <input type="text" id="erpSystem" value="erpnext" placeholder="erp_system">
+  </div>
+  <div>
+    <label>Extractor JSON</label>
+    <input type="file" id="extractorFile" accept=".json" class="file-input">
+  </div>
+  <div>
+    <label>Document</label>
+    <input type="file" id="documentFile" accept=".pdf,.png,.jpg,.jpeg" class="file-input">
+  </div>
+  <button class="btn-secondary" onclick="browseFiles()">Browse Server</button>
+  <button class="btn-primary" id="mapBtn" onclick="runMapping()" disabled>Map</button>
+</div>
+
+<div class="panels">
+  <!-- Panel 1: Original Document (collapsed by default) -->
+  <div class="panel collapsed" id="panelDoc">
+    <div class="panel-header" onclick="togglePanel('panelDoc')">
+      <div class="panel-title">Original Document</div>
+      <span class="panel-toggle">&#9660;</span>
+    </div>
+    <div class="panel-body">
+      <div class="doc-viewer" id="docViewer">
+        <div class="empty-state">
+          <p>Upload a PDF or image to view the original document</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel 2: Extracted Fields (collapsed by default) -->
+  <div class="panel collapsed" id="panelExtracted">
+    <div class="panel-header" onclick="togglePanel('panelExtracted')">
+      <div class="panel-title">Extracted (Extractor Output)</div>
+      <span class="panel-toggle">&#9660;</span>
+    </div>
+    <div class="panel-body">
+      <div id="extractedContent">
+        <div class="empty-state"><p>Upload an extractor JSON file</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel 3: Mapped Fields (expanded by default) -->
+  <div class="panel" id="panelMapped">
+    <div class="panel-header" onclick="togglePanel('panelMapped')">
+      <div class="panel-title">Mapped (Pipeline Result)</div>
+      <span class="panel-toggle">&#9660;</span>
+    </div>
+    <div class="panel-body">
+      <div id="mappedContent">
+        <div class="empty-state"><p>Click "Map" to run the pipeline</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel 4: Ground Truth (expanded by default) -->
+  <div class="panel" id="panelGT">
+    <div class="panel-header" onclick="togglePanel('panelGT')">
+      <div class="panel-title">Ground Truth</div>
+      <span class="panel-toggle">&#9660;</span>
+    </div>
+    <div class="panel-body">
+      <div id="gtContent">
+        <div class="empty-state">
+          <p>Auto-fetched from ERPNext or paste frm.doc JSON below</p>
+          <textarea class="gt-paste" id="gtPaste" placeholder='Paste ERPNext frm.doc JSON here...'></textarea>
+          <button class="btn-secondary" onclick="pasteGroundTruth()">Parse Pasted JSON</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <div>
+    <span>Status: </span>
+    <span class="overall-status" id="overallStatus">—</span>
+  </div>
+  <div>
+    <button class="btn-success" id="feedbackBtn" onclick="submitFeedback()" disabled>Approve &amp; Submit Feedback</button>
+  </div>
+</div>
+
+<!-- File browser modal -->
+<div class="modal-overlay" id="fileModal">
+  <div class="modal">
+    <h3>Select Extractor JSON</h3>
+    <ul class="file-list" id="fileList"></ul>
+    <br>
+    <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Collapsible panels ────────────────────────────────────
+
+function togglePanel(panelId) {
+  document.getElementById(panelId).classList.toggle('collapsed');
+}
+
+function expandPanel(panelId) {
+  document.getElementById(panelId).classList.remove('collapsed');
+}
+
+// ── Shared config (synced with backtest page via localStorage) ──
+
+function loadSharedConfig() {
+  try {
+    const cfg = JSON.parse(localStorage.getItem('backtest_config') || '{}');
+    if (cfg.cfgTenant) document.getElementById('tenantId').value = cfg.cfgTenant;
+    if (cfg.cfgErp) document.getElementById('erpSystem').value = cfg.cfgErp;
+  } catch {}
+}
+
+function saveSharedConfig() {
+  try {
+    const cfg = JSON.parse(localStorage.getItem('backtest_config') || '{}');
+    cfg.cfgTenant = document.getElementById('tenantId').value;
+    cfg.cfgErp = document.getElementById('erpSystem').value;
+    localStorage.setItem('backtest_config', JSON.stringify(cfg));
+  } catch {}
+}
+
+loadSharedConfig();
+
+// Save on change
+document.getElementById('tenantId').addEventListener('change', saveSharedConfig);
+document.getElementById('erpSystem').addEventListener('change', saveSharedConfig);
+
+// State
+let extractorData = null;
+let mapResponse = null;
+
+// ── File handling ──────────────────────────────────────────
+
+document.getElementById('extractorFile').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      extractorData = JSON.parse(ev.target.result);
+      renderExtracted(extractorData);
+      expandPanel('panelExtracted');
+      document.getElementById('mapBtn').disabled = false;
+    } catch (err) {
+      showToast('Invalid JSON file', 'error');
+    }
+  };
+  reader.readAsText(file);
+});
+
+document.getElementById('documentFile').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  loadDocument(file);
+});
+
+function loadDocument(file) {
+  const viewer = document.getElementById('docViewer');
+  const url = URL.createObjectURL(file);
+  if (file.type === 'application/pdf') {
+    viewer.innerHTML = `<embed src="${url}" type="application/pdf" style="width:100%;height:100%;">`;
+  } else {
+    viewer.innerHTML = `<img src="${url}" alt="Invoice document">`;
+  }
+  expandPanel('panelDoc');
+}
+
+// ── Server file browser ────────────────────────────────────
+
+async function browseFiles() {
+  const tenant = document.getElementById('tenantId').value;
+  const erp = document.getElementById('erpSystem').value;
+  try {
+    const resp = await fetch('/api/v1/review/files');
+    if (!resp.ok) {
+      const err = await resp.json();
+      showToast(err.detail || 'Failed to list files', 'error');
+      return;
+    }
+    const files = await resp.json();
+    const list = document.getElementById('fileList');
+    list.innerHTML = '';
+    if (files.length === 0) {
+      list.innerHTML = '<li>No JSON files found</li>';
+    }
+    files.forEach(f => {
+      const li = document.createElement('li');
+      const date = new Date(f.modified * 1000).toLocaleString();
+      const size = (f.size / 1024).toFixed(1);
+      li.innerHTML = `<div class="fname">${esc(f.name)}</div><div class="fmeta">${size} KB &middot; ${date}</div>`;
+      li.onclick = () => loadServerFile(f.path);
+      list.appendChild(li);
+    });
+    document.getElementById('fileModal').classList.add('active');
+  } catch (err) {
+    showToast('Failed to connect to server', 'error');
+  }
+}
+
+async function loadServerFile(path) {
+  closeModal();
+  try {
+    const resp = await fetch(`/api/v1/review/file?path=${encodeURIComponent(path)}`);
+    if (!resp.ok) {
+      const err = await resp.json();
+      showToast(err.detail || 'Failed to load file', 'error');
+      return;
+    }
+    extractorData = await resp.json();
+    renderExtracted(extractorData);
+    expandPanel('panelExtracted');
+    document.getElementById('mapBtn').disabled = false;
+  } catch (err) {
+    showToast('Failed to load file', 'error');
+  }
+}
+
+function closeModal() {
+  document.getElementById('fileModal').classList.remove('active');
+}
+
+// ── Render Extracted Panel ─────────────────────────────────
+
+function renderExtracted(data) {
+  const container = document.getElementById('extractedContent');
+  let html = '<table class="field-table">';
+  html += '<tr><th>Field</th><th>Value</th></tr>';
+
+  // Header fields
+  const headerFields = [
+    ['Company', data.company],
+    ['Supplier', data.supplier_name || data.supplier],
+    ['Bill No', data.bill_no],
+    ['Bill Date', data.bill_date],
+    ['Currency', data.currency],
+    ['Grand Total', data.grand_total || data.total],
+  ];
+  headerFields.forEach(([label, field]) => {
+    html += renderScoredRow(label, field);
+  });
+
+  // Tax IDs
+  if (data.supplier_tax_ids) {
+    html += `<tr><td colspan="2" class="section-header">Tax IDs</td></tr>`;
+    const taxFields = [
+      ['GSTIN', data.supplier_tax_ids.gstin],
+      ['PAN', data.supplier_tax_ids.pan],
+      ['VAT', data.supplier_tax_ids.vat_id],
+      ['Tax ID', data.supplier_tax_ids.tax_id],
+    ];
+    taxFields.forEach(([label, field]) => {
+      if (field && field.value) html += renderScoredRow(label, field);
+    });
+  }
+
+  // Address
+  if (data.supplier_address) {
+    html += `<tr><td colspan="2" class="section-header">Supplier Address</td></tr>`;
+    const addrFields = [
+      ['Address', data.supplier_address.address_line1],
+      ['City', data.supplier_address.city],
+      ['State', data.supplier_address.state],
+      ['Country', data.supplier_address.country],
+      ['Pincode', data.supplier_address.pincode],
+    ];
+    addrFields.forEach(([label, field]) => {
+      if (field && field.value) html += renderScoredRow(label, field);
+    });
+  }
+
+  // Line items
+  if (data.items && data.items.length > 0) {
+    data.items.forEach((item, i) => {
+      html += `<tr><td colspan="2" class="section-header">Line Item ${i + 1}</td></tr>`;
+      const lineFields = [
+        ['Item Name', item.item_name],
+        ['Item Code', item.item_code],
+        ['Description', item.description],
+        ['Qty', item.qty],
+        ['UOM', item.uom],
+        ['Rate', item.rate],
+        ['Amount', item.amount],
+        ['HSN/SAC', item.hsn_sac],
+      ];
+      lineFields.forEach(([label, field]) => {
+        if (field && (field.value || field.value === 0)) html += renderScoredRow(label, field);
+      });
+    });
+  }
+
+  // Taxes
+  if (data.taxes && data.taxes.length > 0) {
+    html += `<tr><td colspan="2" class="section-header">Taxes</td></tr>`;
+    data.taxes.forEach((tax, i) => {
+      const desc = tax.description?.value || `Tax ${i+1}`;
+      const rate = tax.rate?.value ?? '';
+      const amount = tax.tax_amount?.value ?? '';
+      html += `<tr><td class="field-label">${esc(String(desc))}</td><td class="field-value">${rate}% = ${amount}</td></tr>`;
+    });
+  }
+
+  html += '</table>';
+  container.innerHTML = html;
+}
+
+function renderScoredRow(label, field) {
+  if (!field) return '';
+  const val = field.value ?? '';
+  const conf = field.confidence_score ?? 0;
+  const badge = confBadge(conf);
+  return `<tr><td class="field-label">${esc(label)}</td><td class="field-value">${esc(String(val))} ${badge}</td></tr>`;
+}
+
+function confBadge(score) {
+  let cls = 'conf-none';
+  if (score >= 90) cls = 'conf-high';
+  else if (score >= 70) cls = 'conf-med';
+  else if (score >= 50) cls = 'conf-low';
+  return `<span class="conf-badge ${cls}">${score}</span>`;
+}
+
+// ── Map API Call ───────────────────────────────────────────
+
+async function runMapping() {
+  if (!extractorData) return;
+  const tenant = document.getElementById('tenantId').value;
+  const erp = document.getElementById('erpSystem').value;
+  const mapBtn = document.getElementById('mapBtn');
+  mapBtn.disabled = true;
+  mapBtn.textContent = 'Mapping...';
+
+  try {
+    const resp = await fetch('/api/v1/map/extractor', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Tenant-ID': tenant,
+        'X-ERP-System': erp,
+      },
+      body: JSON.stringify({ invoice: extractorData }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      showToast(err.detail || 'Mapping failed', 'error');
+      return;
+    }
+
+    mapResponse = await resp.json();
+    renderMapped(mapResponse);
+    expandPanel('panelMapped');
+    document.getElementById('feedbackBtn').disabled = false;
+
+    // Auto-fetch ground truth if bill_no available
+    const billNo = extractorData.bill_no?.value;
+    if (billNo) {
+      fetchGroundTruth(billNo, tenant, erp);
+    }
+  } catch (err) {
+    showToast('Mapping request failed: ' + err.message, 'error');
+  } finally {
+    mapBtn.disabled = false;
+    mapBtn.textContent = 'Map';
+  }
+}
+
+// ── Render Mapped Panel ───────────────────────────────────
+
+function renderMapped(resp) {
+  const container = document.getElementById('mappedContent');
+  const mappings = resp.mappings || {};
+  const overallStatus = resp.status || '—';
+
+  document.getElementById('overallStatus').textContent = overallStatus;
+  const statusEl = document.getElementById('overallStatus');
+  statusEl.className = 'overall-status';
+  if (overallStatus === 'success') statusEl.style.color = 'var(--green)';
+  else if (overallStatus === 'partial') statusEl.style.color = 'var(--amber)';
+  else statusEl.style.color = 'var(--red)';
+
+  let html = '<table class="field-table">';
+  html += '<tr><th>Field</th><th>Resolved</th></tr>';
+
+  // Separate header and line item mappings
+  const headerKeys = [];
+  const lineKeys = {};
+  for (const [key, detail] of Object.entries(mappings)) {
+    const match = key.match(/^line_items\[(\d+)\]\.(.+)$/);
+    if (match) {
+      const idx = parseInt(match[1]);
+      const field = match[2];
+      if (!lineKeys[idx]) lineKeys[idx] = {};
+      lineKeys[idx][field] = detail;
+    } else {
+      headerKeys.push([key, detail]);
+    }
+  }
+
+  // Header mappings
+  headerKeys.forEach(([key, detail]) => {
+    html += renderMappedRow(key, detail);
+  });
+
+  // Line item mappings
+  const lineIdxs = Object.keys(lineKeys).map(Number).sort((a,b) => a-b);
+  lineIdxs.forEach(idx => {
+    html += `<tr><td colspan="2" class="section-header">Line Item ${idx + 1}</td></tr>`;
+    for (const [field, detail] of Object.entries(lineKeys[idx])) {
+      html += renderMappedRow(field, detail);
+    }
+  });
+
+  // Unresolved
+  if (resp.unresolved && resp.unresolved.length > 0) {
+    html += `<tr><td colspan="2" class="section-header" style="color:var(--red)">Unresolved</td></tr>`;
+    resp.unresolved.forEach(f => {
+      html += `<tr><td class="field-label">${esc(f)}</td><td class="field-value" style="color:var(--red)">—</td></tr>`;
+    });
+  }
+
+  // Review required
+  if (resp.review_required && resp.review_required.length > 0) {
+    html += `<tr><td colspan="2" class="section-header" style="color:var(--amber)">Review Required</td></tr>`;
+    resp.review_required.forEach(f => {
+      html += `<tr><td class="field-label" colspan="2">${esc(f)}</td></tr>`;
+    });
+  }
+
+  html += '</table>';
+  container.innerHTML = html;
+}
+
+function renderMappedRow(key, detail) {
+  const status = detail.status || '';
+  const erpId = detail.erp_id ?? '—';
+  const conf = detail.confidence ?? 0;
+  const strategy = detail.strategy || '';
+  const statusBadge = `<span class="status-badge status-${status}">${status}</span>`;
+  const strategyBadge = strategy ? `<span class="strategy-badge">${esc(strategy)}</span>` : '';
+  const confStr = `<span class="conf-badge ${confClass(conf)}">${(conf * 100).toFixed(0)}</span>`;
+
+  return `<tr class="mapped-${status}">
+    <td class="field-label">${esc(key)}</td>
+    <td class="field-value">
+      <span class="editable" contenteditable="true" data-field="${esc(key)}">${esc(String(erpId))}</span>
+      ${statusBadge} ${strategyBadge} ${confStr}
+    </td>
+  </tr>`;
+}
+
+function confClass(score) {
+  if (score >= 0.88) return 'conf-high';
+  if (score >= 0.70) return 'conf-med';
+  if (score >= 0.50) return 'conf-low';
+  return 'conf-none';
+}
+
+// ── Ground Truth ──────────────────────────────────────────
+
+async function fetchGroundTruth(billNo, tenant, erp) {
+  try {
+    const resp = await fetch(`/api/v1/review/ground-truth?bill_no=${encodeURIComponent(billNo)}`, {
+      headers: { 'X-Tenant-ID': tenant, 'X-ERP-System': erp },
+    });
+    if (!resp.ok) {
+      // Not found is OK — user can paste
+      if (resp.status !== 404) {
+        const err = await resp.json();
+        console.warn('Ground truth fetch failed:', err.detail);
+      }
+      return;
+    }
+    const gt = await resp.json();
+    renderGroundTruth(gt);
+    expandPanel('panelGT');
+  } catch (err) {
+    console.warn('Ground truth fetch error:', err);
+  }
+}
+
+function pasteGroundTruth() {
+  const raw = document.getElementById('gtPaste').value.trim();
+  if (!raw) return;
+  try {
+    let data = JSON.parse(raw);
+    // If it's a full frm.doc, extract the relevant PI fields
+    if (data.doctype === 'Purchase Invoice' || data.supplier) {
+      data = extractGTFromDoc(data);
+    }
+    renderGroundTruth(data);
+    expandPanel('panelGT');
+  } catch (err) {
+    showToast('Invalid JSON: ' + err.message, 'error');
+  }
+}
+
+function extractGTFromDoc(doc) {
+  const gt = {
+    vendor_erp_id: doc.supplier || '',
+    vendor_name: doc.supplier_name || doc.supplier || '',
+    company: doc.company || '',
+    supplier_address: doc.supplier_address || '',
+    cost_center: doc.cost_center || '',
+    taxes_and_charges: doc.taxes_and_charges || '',
+    set_warehouse: doc.set_warehouse || '',
+    line_items: [],
+  };
+  (doc.items || []).forEach(item => {
+    gt.line_items.push({
+      item_code: item.item_code || '',
+      item_name: item.item_name || '',
+      uom: item.uom || '',
+      tax_template: item.item_tax_template || '',
+      description: item.description || '',
+      warehouse: item.warehouse || '',
+      cost_center: item.cost_center || '',
+    });
+  });
+  return gt;
+}
+
+function renderGroundTruth(gt) {
+  const container = document.getElementById('gtContent');
+  let html = '<table class="field-table">';
+  html += '<tr><th>Field</th><th>Expected</th></tr>';
+
+  const fields = [
+    ['Supplier (erp_id)', gt.vendor_erp_id],
+    ['Vendor Name', gt.vendor_name],
+    ['Company', gt.company],
+    ['Supplier Address', gt.supplier_address],
+    ['Cost Center', gt.cost_center],
+    ['Taxes Template', gt.taxes_and_charges],
+    ['Warehouse', gt.set_warehouse],
+  ];
+  fields.forEach(([label, val]) => {
+    if (val) html += `<tr><td class="field-label">${esc(label)}</td><td class="field-value">${esc(String(val))}</td></tr>`;
+  });
+
+  if (gt.line_items && gt.line_items.length > 0) {
+    gt.line_items.forEach((item, i) => {
+      html += `<tr><td colspan="2" class="section-header">Line Item ${i + 1}</td></tr>`;
+      const lineFields = [
+        ['Item Code', item.item_code],
+        ['Item Name', item.item_name],
+        ['UOM', item.uom],
+        ['Tax Template', item.tax_template],
+        ['Description', item.description],
+        ['Warehouse', item.warehouse],
+        ['Cost Center', item.cost_center],
+      ];
+      lineFields.forEach(([label, val]) => {
+        if (val) html += `<tr><td class="field-label">${esc(label)}</td><td class="field-value">${esc(String(val))}</td></tr>`;
+      });
+    });
+  }
+
+  html += '</table>';
+  container.innerHTML = html;
+}
+
+// ── Submit Feedback ───────────────────────────────────────
+
+async function submitFeedback() {
+  if (!mapResponse || !extractorData) return;
+
+  const tenant = document.getElementById('tenantId').value;
+  const erp = document.getElementById('erpSystem').value;
+  const mappings = mapResponse.mappings || {};
+
+  // Get vendor erp_id (possibly edited by user)
+  const vendorField = document.querySelector('[data-field="vendor_name"]') ||
+                      document.querySelector('[data-field="vendor"]');
+  const vendorErpId = vendorField ? vendorField.textContent.trim() : (mappings.vendor_name?.erp_id || '');
+  const vendorName = extractorData.supplier_name?.value || extractorData.supplier?.value || '';
+  const vendorTaxId = extractorData.supplier_tax_ids?.gstin?.value || null;
+  const invoiceNumber = extractorData.bill_no?.value || 'UNKNOWN';
+
+  // Collect line items from mapped panel (user may have edited erp_ids)
+  const lineItems = [];
+  const lineIdxs = new Set();
+  for (const key of Object.keys(mappings)) {
+    const match = key.match(/^line_items\[(\d+)\]/);
+    if (match) lineIdxs.add(parseInt(match[1]));
+  }
+
+  for (const idx of [...lineIdxs].sort((a,b) => a-b)) {
+    const itemEl = document.querySelector(`[data-field="item"]`) ||
+                   document.querySelector(`[data-field="description"]`);
+    const itemErpId = mappings[`line_items[${idx}].item`]?.erp_id ||
+                      mappings[`line_items[${idx}].description`]?.erp_id || '';
+    const uom = mappings[`line_items[${idx}].uom`]?.erp_id || '';
+    const extractorItem = extractorData.items?.[idx];
+    const desc = extractorItem?.item_name?.value || extractorItem?.description?.value || '';
+    const hsnCode = extractorItem?.hsn_sac?.value || null;
+    const itemCode = extractorItem?.item_code?.value || null;
+
+    lineItems.push({
+      description: desc,
+      item_erp_id: String(itemErpId),
+      item_code: itemCode,
+      hsn_code: hsnCode ? String(hsnCode) : null,
+      uom: uom ? String(uom) : null,
+    });
+  }
+
+  const payload = {
+    tenant_id: tenant,
+    erp_system: erp,
+    invoice_number: invoiceNumber,
+    vendor_erp_id: vendorErpId,
+    vendor_name: vendorName,
+    vendor_tax_id: vendorTaxId,
+    line_items: lineItems,
+  };
+
+  const feedbackBtn = document.getElementById('feedbackBtn');
+  feedbackBtn.disabled = true;
+  feedbackBtn.textContent = 'Submitting...';
+
+  try {
+    const resp = await fetch('/api/v1/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      showToast(err.detail || 'Feedback submission failed', 'error');
+      return;
+    }
+    const result = await resp.json();
+    showToast(`Feedback submitted: ${result.records_upserted} records upserted`, 'success');
+  } catch (err) {
+    showToast('Feedback request failed: ' + err.message, 'error');
+  } finally {
+    feedbackBtn.disabled = false;
+    feedbackBtn.textContent = 'Approve & Submit Feedback';
+  }
+}
+
+// ── Utilities ─────────────────────────────────────────────
+
+function esc(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function showToast(msg, type) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.className = 'toast ' + type;
+  setTimeout(() => { toast.className = 'toast'; }, 4000);
+}
+</script>
+</body>
+</html>

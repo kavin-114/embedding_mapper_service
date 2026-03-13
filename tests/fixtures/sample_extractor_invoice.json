@@ -1,0 +1,222 @@
+{
+  "company": {
+    "value": "Ambrosia Supplies Pvt Ltd",
+    "confidence_score": 92
+  },
+  "supplier": {
+    "value": "Kailash Electricals",
+    "confidence_score": 95
+  },
+  "supplier_name": {
+    "value": "Kailash Electricals",
+    "confidence_score": 95
+  },
+  "supplier_tax_ids": {
+    "gstin": {
+      "value": "29AABCK1234H1Z5",
+      "confidence_score": 90
+    },
+    "pan": {
+      "value": "AABCK1234H",
+      "confidence_score": 85
+    },
+    "vat_id": {
+      "value": "",
+      "confidence_score": 0
+    },
+    "tax_id": {
+      "value": "",
+      "confidence_score": 0
+    },
+    "tax_id_type": {
+      "value": "",
+      "confidence_score": 0
+    }
+  },
+  "supplier_address": {
+    "address_line1": {
+      "value": "45 Industrial Area",
+      "confidence_score": 90
+    },
+    "address_line2": {
+      "value": "",
+      "confidence_score": 0
+    },
+    "city": {
+      "value": "Bangalore",
+      "confidence_score": 90
+    },
+    "state": {
+      "value": "Karnataka",
+      "confidence_score": 90
+    },
+    "state_code": {
+      "value": "29",
+      "confidence_score": 85
+    },
+    "country": {
+      "value": "IN",
+      "confidence_score": 90
+    },
+    "pincode": {
+      "value": "560001",
+      "confidence_score": 80
+    },
+    "phone": {
+      "value": "",
+      "confidence_score": 0
+    },
+    "email": {
+      "value": "",
+      "confidence_score": 0
+    }
+  },
+  "bill_no": {
+    "value": "INV-2026-0042",
+    "confidence_score": 98
+  },
+  "bill_date": {
+    "value": "2026-03-01",
+    "confidence_score": 95
+  },
+  "posting_date": {
+    "value": "2026-03-01",
+    "confidence_score": 95
+  },
+  "currency": {
+    "value": "INR",
+    "confidence_score": 99
+  },
+  "grand_total": {
+    "value": "11800.00",
+    "confidence_score": 92
+  },
+  "total": {
+    "value": "10000.00",
+    "confidence_score": 90
+  },
+  "items": [
+    {
+      "item_code": {
+        "value": "WIRE-CU-2.5",
+        "confidence_score": 88
+      },
+      "item_name": {
+        "value": "Copper Wire 2.5mm",
+        "confidence_score": 93
+      },
+      "description": {
+        "value": "Copper wire 2.5mm sq, PVC insulated",
+        "confidence_score": 90
+      },
+      "qty": {
+        "value": 100,
+        "confidence_score": 95
+      },
+      "uom": {
+        "value": "Meter",
+        "confidence_score": 92
+      },
+      "rate": {
+        "value": 50.00,
+        "confidence_score": 90
+      },
+      "amount": {
+        "value": 5000.00,
+        "confidence_score": 88
+      },
+      "discount_percentage": {
+        "value": "",
+        "confidence_score": 0
+      },
+      "hsn_sac": {
+        "value": "7408",
+        "confidence_score": 80
+      }
+    },
+    {
+      "item_code": {
+        "value": "",
+        "confidence_score": 0
+      },
+      "item_name": {
+        "value": "MCB 32A Single Pole",
+        "confidence_score": 91
+      },
+      "description": {
+        "value": "",
+        "confidence_score": 0
+      },
+      "qty": {
+        "value": 10,
+        "confidence_score": 96
+      },
+      "uom": {
+        "value": "Nos",
+        "confidence_score": 94
+      },
+      "rate": {
+        "value": 500.00,
+        "confidence_score": 90
+      },
+      "amount": {
+        "value": 5000.00,
+        "confidence_score": 88
+      },
+      "discount_percentage": {
+        "value": "",
+        "confidence_score": 0
+      },
+      "hsn_sac": {
+        "value": "8536",
+        "confidence_score": 75
+      }
+    }
+  ],
+  "taxes": [
+    {
+      "charge_type": {
+        "value": "On Net Total",
+        "confidence_score": 80
+      },
+      "account_head": {
+        "value": "CGST - AS",
+        "confidence_score": 75
+      },
+      "description": {
+        "value": "CGST @ 9%",
+        "confidence_score": 90
+      },
+      "rate": {
+        "value": 9.0,
+        "confidence_score": 85
+      },
+      "tax_amount": {
+        "value": 900.0,
+        "confidence_score": 80
+      }
+    },
+    {
+      "charge_type": {
+        "value": "On Net Total",
+        "confidence_score": 80
+      },
+      "account_head": {
+        "value": "SGST - AS",
+        "confidence_score": 75
+      },
+      "description": {
+        "value": "SGST @ 9%",
+        "confidence_score": 90
+      },
+      "rate": {
+        "value": 9.0,
+        "confidence_score": 85
+      },
+      "tax_amount": {
+        "value": 900.0,
+        "confidence_score": 80
+      }
+    }
+  ]
+}

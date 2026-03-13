@@ -12,12 +12,44 @@ from app.models.resolution import (
     ResolutionStrategy,
     VendorStatus,
 )
+from app.logging_config import get_logger
 from app.services.context_builder import ContextBuilder
 
 if TYPE_CHECKING:
     from app.config import Settings
     from app.services.embedding_service import EmbeddingService
     from app.services.vector_service import VectorService
+
+logger = get_logger(__name__)
+
+# UOM alias groups — each group lists equivalent UOM strings.
+# When filtering by UOM, all aliases in the same group are included.
+_UOM_ALIAS_GROUPS: list[set[str]] = [
+    {"Nos", "nos", "Each", "each", "Pcs", "pcs", "Numbers", "numbers", "Number", "number", "Pieces", "pieces"},
+    {"Kg", "kg", "kgs", "Kgs", "Kilogram", "kilogram"},
+    {"Mtr", "mtr", "Meter", "meter", "Metre", "metre"},
+    {"Ltr", "ltr", "Litre", "litre", "Liter", "liter"},
+    {"Box", "box", "Boxes", "boxes"},
+    {"Set", "set", "Sets", "sets"},
+    {"Pair", "pair", "Pairs", "pairs"},
+]
+
+_UOM_ALIAS_MAP: dict[str, set[str]] = {}
+for _group in _UOM_ALIAS_GROUPS:
+    for _alias in _group:
+        _UOM_ALIAS_MAP[_alias] = _group
+
+
+def _expand_uom_aliases(uom_value: str) -> list[str]:
+    """Return all equivalent UOM strings for a given value."""
+    group = _UOM_ALIAS_MAP.get(uom_value)
+    if group:
+        return sorted(group)
+    # Also try case-insensitive lookup
+    group = _UOM_ALIAS_MAP.get(uom_value.strip())
+    if group:
+        return sorted(group)
+    return [uom_value]
 
 
 class Resolver:
@@ -60,6 +92,7 @@ class Resolver:
 
         # Step 1 — hard match on tax_id if high confidence
         if tax_id_field and tax_id_field.confidence >= threshold:
+            logger.debug("vendor.hard_match_attempt", tax_id=str(tax_id_field.value))
             meta = self._vector.hard_match(
                 entity="vendors",
                 tenant_id=tenant_id,
@@ -67,6 +100,7 @@ class Resolver:
                 where={"tax_id": str(tax_id_field.value)},
             )
             if meta is not None:
+                logger.debug("vendor.hard_match_hit", erp_id=meta["erp_id"])
                 return (
                     FKMatch(
                         erp_id=meta["erp_id"],
@@ -77,12 +111,53 @@ class Resolver:
                     ),
                     VendorStatus.FOUND,
                 )
+            logger.debug("vendor.hard_match_miss", tax_id=str(tax_id_field.value))
             # hard key miss — fall through to semantic
 
-        # Step 2 — semantic search on vendor_name
+        # Compute embedding upfront — reused by context lookup and semantic search
         vendor_text = str(invoice.vendor_name.value)
         query_vec = self._embedding.encode([vendor_text])[0]
 
+        # Step 1.5 — context-assisted hard match via vendor_context
+        ctx_results = self._vector.search_vendor_context(
+            tenant_id=tenant_id,
+            erp_system=erp_system,
+            query_embedding=query_vec,
+            n_results=1,
+        )
+        if ctx_results:
+            ctx_top = ctx_results[0]
+            ctx_score = ctx_top["score"]
+            ctx_tax_id = ctx_top["metadata"].get("vendor_tax_id")
+            if ctx_score >= self._settings.context_match_threshold and ctx_tax_id:
+                logger.debug(
+                    "vendor.context_hard_match_attempt",
+                    ctx_score=ctx_score,
+                    ctx_tax_id=ctx_tax_id,
+                )
+                meta = self._vector.hard_match(
+                    entity="vendors",
+                    tenant_id=tenant_id,
+                    erp_system=erp_system,
+                    where={"tax_id": str(ctx_tax_id)},
+                )
+                if meta is not None:
+                    logger.debug(
+                        "vendor.context_hard_match_hit",
+                        erp_id=meta["erp_id"],
+                    )
+                    return (
+                        FKMatch(
+                            erp_id=meta["erp_id"],
+                            matched_on=f"context_tax_id={ctx_tax_id}",
+                            strategy=ResolutionStrategy.CONTEXT_HARD_KEY,
+                            confidence=1.0,
+                            candidates=[],
+                        ),
+                        VendorStatus.FOUND,
+                    )
+
+        # Step 2 — semantic search on vendor_name
         results = self._vector.semantic_search(
             entity="vendors",
             tenant_id=tenant_id,
@@ -104,10 +179,24 @@ class Resolver:
         vendor_region = str(top["metadata"].get("region_code", ""))
         company_region = self._settings.company_region_code
         if vendor_region and company_region:
+            original_score = top_score
             if vendor_region == company_region:
                 top_score = min(1.0, top_score + 0.08)
+                logger.debug(
+                    "vendor.region_boost",
+                    region=vendor_region,
+                    original_score=original_score,
+                    boosted_score=top_score,
+                )
             else:
                 top_score = max(0.0, top_score - 0.15)
+                logger.debug(
+                    "vendor.region_penalty",
+                    vendor_region=vendor_region,
+                    company_region=company_region,
+                    original_score=original_score,
+                    penalized_score=top_score,
+                )
 
         candidates = [
             {"erp_id": r["erp_id"], "score": r["score"], "metadata": r["metadata"]}
@@ -260,7 +349,7 @@ class Resolver:
         threshold = self._settings.hard_key_threshold
         filter_thresh = self._settings.filter_threshold
 
-        # Step 1 — hard match on item_code
+        # Step 1a — hard match on item_code
         item_code = line_item_fields.get("item_code")
         if item_code and item_code.confidence >= threshold:
             meta = self._vector.hard_match(
@@ -277,6 +366,23 @@ class Resolver:
                     confidence=1.0,
                 )
 
+        # Step 1b — hard match on item_name (description from invoice)
+        desc = line_item_fields.get("description")
+        if desc and desc.confidence >= threshold:
+            meta = self._vector.hard_match(
+                entity="items",
+                tenant_id=tenant_id,
+                erp_system=erp_system,
+                where={"item_name": str(desc.value)},
+            )
+            if meta is not None:
+                return FKMatch(
+                    erp_id=meta["erp_id"],
+                    matched_on=f"item_name={desc.value}",
+                    strategy=ResolutionStrategy.HARD_KEY,
+                    confidence=1.0,
+                )
+
         # Step 2 — build filters
         where_filters: dict[str, Any] = {}
         hsn = line_item_fields.get("hsn_code")
@@ -285,7 +391,11 @@ class Resolver:
 
         uom = line_item_fields.get("uom")
         if uom and uom.confidence >= filter_thresh:
-            where_filters["uom"] = str(uom.value)
+            aliases = _expand_uom_aliases(str(uom.value))
+            if len(aliases) > 1:
+                where_filters["uom"] = {"$in": aliases}
+            else:
+                where_filters["uom"] = aliases[0]
 
         if context.item_group_filter:
             where_filters["item_group"] = context.item_group_filter
@@ -320,11 +430,54 @@ class Resolver:
             }
             for r in results:
                 if r["erp_id"] in preferred_ids:
+                    original = r["score"]
                     r["score"] = min(1.0, r["score"] + 0.10)
+                    logger.debug(
+                        "item.history_boost",
+                        erp_id=r["erp_id"],
+                        original_score=original,
+                        boosted_score=r["score"],
+                    )
             # Re-sort after boosting
             results.sort(key=lambda r: r["score"], reverse=True)
 
         top = results[0]
+
+        # Step 5 — context fallback: if items search is below auto_map
+        # threshold and vendor is known, search vendor_context filtered
+        # by vendor_erp_id for previously approved mappings.
+        auto_threshold = self._settings.auto_map_threshold
+        if top["score"] < auto_threshold and context.vendor_known and context.vendor_erp_id:
+            ctx_results = self._vector.search_vendor_context(
+                tenant_id=tenant_id,
+                erp_system=erp_system,
+                query_embedding=query_vec,
+                n_results=1,
+                where={"vendor_erp_id": str(context.vendor_erp_id)},
+            )
+            if ctx_results:
+                ctx_top = ctx_results[0]
+                if ctx_top["score"] >= auto_threshold:
+                    ctx_item_erp_id = ctx_top["metadata"].get("item_erp_id", ctx_top["erp_id"])
+                    logger.debug(
+                        "item.context_fallback",
+                        vendor_erp_id=context.vendor_erp_id,
+                        item_erp_id=ctx_item_erp_id,
+                        score=ctx_top["score"],
+                        items_top_score=top["score"],
+                    )
+                    return FKMatch(
+                        erp_id=ctx_item_erp_id,
+                        matched_on=f"vendor_context:{context.vendor_erp_id}+{search_text}",
+                        strategy=ResolutionStrategy.CONTEXT_HARD_KEY,
+                        confidence=ctx_top["score"],
+                        candidates=[{
+                            "erp_id": ctx_item_erp_id,
+                            "score": ctx_top["score"],
+                            "metadata": ctx_top["metadata"],
+                        }],
+                    )
+
         candidates = [
             {"erp_id": r["erp_id"], "score": r["score"], "metadata": r["metadata"]}
             for r in results
@@ -476,6 +629,198 @@ class Resolver:
             strategy=strategy,
             confidence=top["score"],
             candidates=candidates,
+        )
+
+    # ── context-driven resolvers (company, addresses, cost_center, etc.) ──
+
+    def resolve_company(
+        self,
+        company_name: str | None,
+        tenant_id: str,
+        erp_system: str,
+    ) -> FKMatch:
+        """Resolve the company FK.
+
+        If company_name is provided, hard-match on company_name.
+        Otherwise, return the first (often only) company in the collection.
+        """
+        if company_name:
+            meta = self._vector.hard_match(
+                entity="companies",
+                tenant_id=tenant_id,
+                erp_system=erp_system,
+                where={"company_name": company_name},
+            )
+            if meta is not None:
+                logger.debug("company.hard_match_hit", erp_id=meta["erp_id"])
+                return FKMatch(
+                    erp_id=meta["erp_id"],
+                    matched_on=f"company_name={company_name}",
+                    strategy=ResolutionStrategy.HARD_KEY,
+                    confidence=1.0,
+                )
+
+        # Fallback — semantic search
+        query_text = company_name or "company"
+        query_vec = self._embedding.encode([query_text])[0]
+        results = self._vector.semantic_search(
+            entity="companies",
+            tenant_id=tenant_id,
+            erp_system=erp_system,
+            query_embedding=query_vec,
+            n_results=1,
+        )
+        if not results:
+            return FKMatch(strategy=ResolutionStrategy.NOT_FOUND)
+
+        top = results[0]
+        return FKMatch(
+            erp_id=top["erp_id"],
+            matched_on=query_text,
+            strategy=ResolutionStrategy.PURE_SEMANTIC,
+            confidence=top["score"],
+        )
+
+    def resolve_address(
+        self,
+        link_name: str,
+        address_type: str,
+        tenant_id: str,
+        erp_system: str,
+        is_shipping: bool = False,
+    ) -> FKMatch:
+        """Resolve an address FK by linked entity + address type.
+
+        Args:
+            link_name: The vendor or company erp_id that owns the address.
+            address_type: Filter field — 'link_supplier' or 'link_company'.
+            is_shipping: If True, prefer is_shipping_address over is_primary_address.
+        """
+        where: dict[str, Any] = {address_type: link_name}
+        meta = self._vector.hard_match(
+            entity="addresses",
+            tenant_id=tenant_id,
+            erp_system=erp_system,
+            where=where,
+        )
+        if meta is not None:
+            logger.debug(
+                "address.hard_match_hit",
+                link=link_name,
+                address_type=address_type,
+                erp_id=meta["erp_id"],
+            )
+            return FKMatch(
+                erp_id=meta["erp_id"],
+                matched_on=f"{address_type}={link_name}",
+                strategy=ResolutionStrategy.HARD_KEY,
+                confidence=1.0,
+            )
+
+        logger.debug("address.not_found", link=link_name, address_type=address_type)
+        return FKMatch(strategy=ResolutionStrategy.NOT_FOUND)
+
+    def resolve_cost_center(
+        self,
+        company_erp_id: str | None,
+        tenant_id: str,
+        erp_system: str,
+    ) -> FKMatch:
+        """Resolve cost center, filtered by company. Prefers non-group entries."""
+        where: dict[str, Any] | None = None
+        if company_erp_id:
+            where = {"$and": [{"company": company_erp_id}, {"is_group": False}]}
+
+        query_text = f"{company_erp_id} cost center" if company_erp_id else "cost center"
+        query_vec = self._embedding.encode([query_text])[0]
+        results = self._vector.semantic_search(
+            entity="cost_centers",
+            tenant_id=tenant_id,
+            erp_system=erp_system,
+            query_embedding=query_vec,
+            n_results=1,
+            where=where,
+        )
+        if not results:
+            return FKMatch(strategy=ResolutionStrategy.NOT_FOUND)
+
+        top = results[0]
+        return FKMatch(
+            erp_id=top["erp_id"],
+            matched_on=query_text,
+            strategy=ResolutionStrategy.FILTERED_SEMANTIC if where else ResolutionStrategy.PURE_SEMANTIC,
+            confidence=top["score"],
+        )
+
+    def resolve_warehouse(
+        self,
+        company_erp_id: str | None,
+        tenant_id: str,
+        erp_system: str,
+    ) -> FKMatch:
+        """Resolve warehouse, filtered by company. Prefers non-group entries."""
+        where: dict[str, Any] | None = None
+        if company_erp_id:
+            where = {"$and": [{"company": company_erp_id}, {"is_group": False}]}
+
+        query_text = f"{company_erp_id} warehouse stores" if company_erp_id else "warehouse"
+        query_vec = self._embedding.encode([query_text])[0]
+        results = self._vector.semantic_search(
+            entity="warehouses",
+            tenant_id=tenant_id,
+            erp_system=erp_system,
+            query_embedding=query_vec,
+            n_results=1,
+            where=where,
+        )
+        if not results:
+            return FKMatch(strategy=ResolutionStrategy.NOT_FOUND)
+
+        top = results[0]
+        return FKMatch(
+            erp_id=top["erp_id"],
+            matched_on=query_text,
+            strategy=ResolutionStrategy.FILTERED_SEMANTIC if where else ResolutionStrategy.PURE_SEMANTIC,
+            confidence=top["score"],
+        )
+
+    def resolve_tax_template(
+        self,
+        company_erp_id: str | None,
+        tax_component: str | None,
+        tenant_id: str,
+        erp_system: str,
+    ) -> FKMatch:
+        """Resolve Purchase Taxes and Charges Template.
+
+        Filters by company. Uses tax_component as search hint if available.
+        """
+        where: dict[str, Any] | None = None
+        if company_erp_id:
+            where = {"company": company_erp_id}
+
+        query_text = tax_component or "tax"
+        if company_erp_id:
+            query_text = f"{query_text} {company_erp_id}"
+
+        query_vec = self._embedding.encode([query_text])[0]
+        results = self._vector.semantic_search(
+            entity="tax_templates",
+            tenant_id=tenant_id,
+            erp_system=erp_system,
+            query_embedding=query_vec,
+            n_results=1,
+            where=where,
+        )
+        if not results:
+            return FKMatch(strategy=ResolutionStrategy.NOT_FOUND)
+
+        top = results[0]
+        return FKMatch(
+            erp_id=top["erp_id"],
+            matched_on=query_text,
+            strategy=ResolutionStrategy.FILTERED_SEMANTIC if where else ResolutionStrategy.PURE_SEMANTIC,
+            confidence=top["score"],
         )
 
     # ── generic helpers ──────────────────────────────────────────────

@@ -42,7 +42,12 @@ def seed_direct(data: dict) -> None:
     erp_system = data["erp_system"]
     now = datetime.now(timezone.utc)
 
-    for entity in ("vendors", "items", "tax_codes", "uoms"):
+    all_entities = (
+        "vendors", "items", "tax_codes", "uoms",
+        "companies", "addresses", "cost_centers", "warehouses", "tax_templates",
+    )
+
+    for entity in all_entities:
         records = data.get(entity, [])
         if not records:
             print(f"  {entity}: no records, skipping")
@@ -60,7 +65,7 @@ def seed_direct(data: dict) -> None:
         print(f"  {entity}: {count} records upserted")
 
     print("\nDone! Collections created:")
-    for entity in ("vendors", "items", "tax_codes", "uoms"):
+    for entity in all_entities:
         name = vector_svc.collection_name(entity, tenant_id, erp_system)
         print(f"  - {name}")
 
@@ -73,7 +78,12 @@ def seed_via_api(data: dict) -> None:
     erp_system = data["erp_system"]
     now = datetime.now(timezone.utc).isoformat()
 
-    for entity in ("vendors", "items", "tax_codes", "uoms"):
+    all_entities = (
+        "vendors", "items", "tax_codes", "uoms",
+        "companies", "addresses", "cost_centers", "warehouses", "tax_templates",
+    )
+
+    for entity in all_entities:
         records = data.get(entity, [])
         if not records:
             print(f"  {entity}: no records, skipping")

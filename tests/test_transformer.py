@@ -66,7 +66,7 @@ class TestTransformERPNext:
                     "uom": "NOS",
                     "tax_rate": "Output Tax IGST - 18%",
                 },
-                "raw": {"quantity": 100, "unit_price": 100.00},
+                "raw": {"item_name": "Steel Bolts M10x50", "quantity": 100, "unit_price": 100.00},
             }
         ]
 
@@ -78,6 +78,7 @@ class TestTransformERPNext:
         assert result["currency"] == "INR"
         assert result["grand_total"] == 11800.00
         assert len(result["items"]) == 1
+        assert result["items"][0]["item_code"] == "Steel Bolts M10x50"
         assert result["items"][0]["item_name"] == "Steel Bolts M10x50"
         assert result["items"][0]["qty"] == 100
         assert result["items"][0]["rate"] == 100.00

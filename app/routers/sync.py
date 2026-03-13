@@ -17,7 +17,10 @@ router = APIRouter(prefix="/api/v1", tags=["sync"])
 
 
 class SyncRequest(BaseModel):
-    entity: str = Field(..., pattern="^(vendors|items|tax_codes|uoms)$")
+    entity: str = Field(
+        ...,
+        pattern="^(vendors|items|tax_codes|uoms|companies|addresses|cost_centers|warehouses|tax_templates)$",
+    )
     tenant_id: str
     erp_system: str
     records: list[dict[str, Any]]

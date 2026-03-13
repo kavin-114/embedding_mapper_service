@@ -6,8 +6,11 @@ services:
     environment:
       - CHROMA_HOST=chromadb
       - CHROMA_PORT=8000
-      - COMPANY_STATE_CODE=29
+      - COMPANY_COUNTRY=IN
+      - COMPANY_REGION_CODE=29
       - EMBEDDING_MODEL=all-MiniLM-L6-v2
+      - LOG_FORMAT=json
+      - LOG_LEVEL=INFO
     depends_on:
       chromadb:
         condition: service_healthy

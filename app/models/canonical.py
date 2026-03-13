@@ -54,3 +54,6 @@ class CanonicalInvoice(BaseModel):
     currency: str = "INR"
     total_amount: float
     line_items: list[CanonicalLineItem]
+    company_name: str | None = None
+    supplier_country: str | None = None
+    supplier_region_code: str | None = None

@@ -151,6 +151,57 @@ class TestSemanticSearch:
         assert results == []
 
 
+class TestSearchVendorContext:
+    @patch("app.services.vector_service.chromadb.HttpClient")
+    def test_returns_scored_results(self, MockClient):
+        mock_collection = MagicMock()
+        mock_collection.query.return_value = {
+            "ids": [["v1__item1"]],
+            "distances": [[0.2]],
+            "metadatas": [[{
+                "vendor_erp_id": "SUP-001",
+                "vendor_tax_id": "29ABC",
+                "item_erp_id": "ITEM-001",
+            }]],
+        }
+        MockClient.return_value.get_collection.return_value = mock_collection
+
+        settings = Settings(chroma_host="localhost", chroma_port=8000)
+        svc = VectorService(settings)
+
+        results = svc.search_vendor_context("t1", "erpnext", [0.1] * 10, n_results=1)
+
+        assert len(results) == 1
+        assert results[0]["score"] == pytest.approx(0.8)
+        assert results[0]["metadata"]["vendor_tax_id"] == "29ABC"
+
+    @patch("app.services.vector_service.chromadb.HttpClient")
+    def test_returns_empty_when_collection_missing(self, MockClient):
+        MockClient.return_value.get_collection.side_effect = Exception("not found")
+
+        settings = Settings(chroma_host="localhost", chroma_port=8000)
+        svc = VectorService(settings)
+
+        results = svc.search_vendor_context("t1", "erpnext", [0.1] * 10)
+        assert results == []
+
+    @patch("app.services.vector_service.chromadb.HttpClient")
+    def test_returns_empty_when_no_results(self, MockClient):
+        mock_collection = MagicMock()
+        mock_collection.query.return_value = {
+            "ids": [[]],
+            "distances": [[]],
+            "metadatas": [[]],
+        }
+        MockClient.return_value.get_collection.return_value = mock_collection
+
+        settings = Settings(chroma_host="localhost", chroma_port=8000)
+        svc = VectorService(settings)
+
+        results = svc.search_vendor_context("t1", "erpnext", [0.1] * 10)
+        assert results == []
+
+
 class TestSyncTime:
     @patch("app.services.vector_service.chromadb.HttpClient")
     def test_records_and_retrieves_sync_time(self, MockClient):

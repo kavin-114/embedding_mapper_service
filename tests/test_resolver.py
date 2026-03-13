@@ -37,7 +37,9 @@ def mock_embedding():
 
 @pytest.fixture
 def mock_vector():
-    return MagicMock()
+    svc = MagicMock()
+    svc.search_vendor_context.return_value = []
+    return svc
 
 
 @pytest.fixture
@@ -194,6 +196,152 @@ class TestVendorResolution:
 
         assert status == VendorStatus.FOUND
         mock_vector.hard_match.assert_not_called()
+
+
+# ── Context-assisted vendor match tests ────────────────────────────
+
+
+class TestContextAssistedVendorMatch:
+    def test_context_match_succeeds_with_hard_key(
+        self, resolver, mock_vector, mock_embedding, no_tax_id_invoice
+    ):
+        """Context match above threshold with vendor_tax_id → FOUND via CONTEXT_HARD_KEY."""
+        mock_vector.search_vendor_context.return_value = [
+            {
+                "erp_id": "v1__item1",
+                "score": 0.82,
+                "distance": 0.18,
+                "metadata": {"vendor_tax_id": "29ABCDE1234F1Z5", "vendor_erp_id": "SUP-001"},
+            }
+        ]
+        mock_vector.hard_match.return_value = {
+            "erp_id": "SUP-001",
+            "tax_id": "29ABCDE1234F1Z5",
+            "region_code": "29",
+        }
+
+        match, status = resolver.resolve_vendor(no_tax_id_invoice, "t1", "erpnext")
+
+        assert status == VendorStatus.FOUND
+        assert match.strategy == ResolutionStrategy.CONTEXT_HARD_KEY
+        assert match.confidence == 1.0
+        assert match.erp_id == "SUP-001"
+        mock_vector.search_vendor_context.assert_called_once()
+
+    def test_context_score_below_threshold_falls_through(
+        self, resolver, mock_vector, mock_embedding, no_tax_id_invoice
+    ):
+        """Context score below threshold → falls through to semantic search."""
+        mock_vector.search_vendor_context.return_value = [
+            {
+                "erp_id": "v1__item1",
+                "score": 0.60,
+                "distance": 0.40,
+                "metadata": {"vendor_tax_id": "29ABCDE1234F1Z5"},
+            }
+        ]
+        mock_vector.semantic_search.return_value = [
+            {
+                "erp_id": "SUP-010",
+                "score": 0.91,
+                "distance": 0.09,
+                "metadata": {"erp_id": "SUP-010"},
+            }
+        ]
+
+        match, status = resolver.resolve_vendor(no_tax_id_invoice, "t1", "erpnext")
+
+        assert status == VendorStatus.FOUND
+        assert match.strategy == ResolutionStrategy.PURE_SEMANTIC
+        mock_vector.semantic_search.assert_called_once()
+
+    def test_context_match_no_vendor_tax_id_falls_through(
+        self, resolver, mock_vector, mock_embedding, no_tax_id_invoice
+    ):
+        """Context match found but no vendor_tax_id in metadata → falls through."""
+        mock_vector.search_vendor_context.return_value = [
+            {
+                "erp_id": "v1__item1",
+                "score": 0.85,
+                "distance": 0.15,
+                "metadata": {"vendor_erp_id": "SUP-001"},
+            }
+        ]
+        mock_vector.semantic_search.return_value = [
+            {
+                "erp_id": "SUP-010",
+                "score": 0.91,
+                "distance": 0.09,
+                "metadata": {"erp_id": "SUP-010"},
+            }
+        ]
+
+        match, status = resolver.resolve_vendor(no_tax_id_invoice, "t1", "erpnext")
+
+        assert match.strategy == ResolutionStrategy.PURE_SEMANTIC
+        mock_vector.hard_match.assert_not_called()
+
+    def test_context_tax_id_but_vendor_deleted_falls_through(
+        self, resolver, mock_vector, mock_embedding, no_tax_id_invoice
+    ):
+        """Context has tax_id but vendor no longer in master → falls through to semantic."""
+        mock_vector.search_vendor_context.return_value = [
+            {
+                "erp_id": "v1__item1",
+                "score": 0.85,
+                "distance": 0.15,
+                "metadata": {"vendor_tax_id": "29DELETED1234Z5"},
+            }
+        ]
+        mock_vector.hard_match.return_value = None  # vendor deleted
+        mock_vector.semantic_search.return_value = [
+            {
+                "erp_id": "SUP-010",
+                "score": 0.91,
+                "distance": 0.09,
+                "metadata": {"erp_id": "SUP-010"},
+            }
+        ]
+
+        match, status = resolver.resolve_vendor(no_tax_id_invoice, "t1", "erpnext")
+
+        assert match.strategy == ResolutionStrategy.PURE_SEMANTIC
+        mock_vector.semantic_search.assert_called_once()
+
+    def test_no_vendor_context_collection_falls_through(
+        self, resolver, mock_vector, mock_embedding, no_tax_id_invoice
+    ):
+        """No vendor_context collection → returns [] → semantic fallback."""
+        mock_vector.search_vendor_context.return_value = []
+        mock_vector.semantic_search.return_value = [
+            {
+                "erp_id": "SUP-010",
+                "score": 0.91,
+                "distance": 0.09,
+                "metadata": {"erp_id": "SUP-010"},
+            }
+        ]
+
+        match, status = resolver.resolve_vendor(no_tax_id_invoice, "t1", "erpnext")
+
+        assert match.strategy == ResolutionStrategy.PURE_SEMANTIC
+        mock_vector.hard_match.assert_not_called()
+
+    def test_confident_tax_id_skips_context_step(
+        self, resolver, mock_vector, sample_invoice
+    ):
+        """Extractor has confident tax_id → hard match succeeds, context never called."""
+        mock_vector.hard_match.return_value = {
+            "erp_id": "SUP-001",
+            "tax_id": "27AAACT2727Q1ZV",
+            "region_code": "27",
+        }
+
+        match, status = resolver.resolve_vendor(sample_invoice, "t1", "erpnext")
+
+        assert status == VendorStatus.FOUND
+        assert match.strategy == ResolutionStrategy.HARD_KEY
+        mock_vector.search_vendor_context.assert_not_called()
 
 
 # ── Unknown vendor handler tests ───────────────────────────────────

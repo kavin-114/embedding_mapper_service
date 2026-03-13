@@ -80,12 +80,6 @@ def unknown_vendor_invoice(all_sample_invoices) -> CanonicalInvoice:
 
 
 @pytest.fixture
-def interstate_invoice(all_sample_invoices) -> CanonicalInvoice:
-    """Interstate invoice — vendor region != company region."""
-    return all_sample_invoices["interstate_invoice"]
-
-
-@pytest.fixture
 def no_tax_id_invoice(all_sample_invoices) -> CanonicalInvoice:
     """Invoice with no tax ID — purely semantic vendor resolution."""
     return all_sample_invoices["no_tax_id_invoice"]

@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from typing import Any, TYPE_CHECKING
 
+from app.logging_config import get_logger
 from app.models.resolution import InvoiceContext
 
 if TYPE_CHECKING:
     from app.config import Settings
     from app.services.vector_service import VectorService
+
+logger = get_logger(__name__)
 
 
 class ContextBuilder:
@@ -48,6 +51,15 @@ class ContextBuilder:
             self._company_region_code,
         )
 
+        logger.debug(
+            "context.tax_scope_derived",
+            vendor_country=vendor_country,
+            vendor_region=vendor_region,
+            company_country=self._company_country,
+            company_region=self._company_region_code,
+            tax_scope=tax_scope,
+        )
+
         item_group = vendor_metadata.get("category") or vendor_metadata.get("item_group")
 
         # Higher vendor confidence → lower floor
@@ -62,6 +74,11 @@ class ContextBuilder:
                 tenant_id=tenant_id,
                 erp_system=erp_system,
                 vendor_erp_id=str(vendor_erp_id),
+            )
+            logger.debug(
+                "context.preferred_items",
+                vendor_erp_id=str(vendor_erp_id),
+                items_count=len(history),
             )
             if history:
                 preferred_items = [

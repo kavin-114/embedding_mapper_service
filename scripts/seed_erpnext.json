@@ -446,5 +446,104 @@
     {"erp_id": "Box", "text": "Box Carton Pack Container", "uom_code": "BOX"},
     {"erp_id": "Ltr", "text": "Ltr Litre Liquid Volume", "uom_code": "LTR"},
     {"erp_id": "Sqm", "text": "Sqm Square Meter Area", "uom_code": "SQM"}
+  ],
+
+  "companies": [
+    {
+      "erp_id": "Demo Manufacturing Co",
+      "text": "Demo Manufacturing Co",
+      "company_name": "Demo Manufacturing Co",
+      "country": "IN",
+      "default_currency": "INR",
+      "abbr": "DMC",
+      "default_cost_center": "Main - DMC",
+      "default_expense_account": "Cost of Goods Sold - DMC",
+      "default_payable_account": "Creditors - DMC",
+      "active": true
+    }
+  ],
+
+  "addresses": [
+    {
+      "erp_id": "Tata Steel-Billing",
+      "text": "Tata Steel Trading Co Billing",
+      "address_title": "Tata Steel Trading Co",
+      "address_type": "Billing",
+      "address_line1": "Bombay House, 24 Homi Mody Street",
+      "city": "Mumbai",
+      "state": "Maharashtra",
+      "country": "India",
+      "pincode": "400001",
+      "link_supplier": "Tata Steel Trading Co",
+      "is_primary_address": true,
+      "is_shipping_address": false,
+      "disabled": false
+    },
+    {
+      "erp_id": "DMC-Billing",
+      "text": "Demo Manufacturing Co Billing",
+      "address_title": "Demo Manufacturing Co",
+      "address_type": "Billing",
+      "address_line1": "123 Industrial Area",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "country": "India",
+      "pincode": "560001",
+      "link_company": "Demo Manufacturing Co",
+      "is_primary_address": true,
+      "is_shipping_address": false,
+      "disabled": false
+    }
+  ],
+
+  "cost_centers": [
+    {
+      "erp_id": "Main - DMC",
+      "text": "Main",
+      "cost_center_name": "Main",
+      "company": "Demo Manufacturing Co",
+      "is_group": false,
+      "disabled": false
+    },
+    {
+      "erp_id": "Production - DMC",
+      "text": "Production",
+      "cost_center_name": "Production",
+      "company": "Demo Manufacturing Co",
+      "parent_cost_center": "Main - DMC",
+      "is_group": false,
+      "disabled": false
+    }
+  ],
+
+  "warehouses": [
+    {
+      "erp_id": "Stores - DMC",
+      "text": "Stores",
+      "warehouse_name": "Stores",
+      "warehouse_type": "Stores",
+      "company": "Demo Manufacturing Co",
+      "is_group": false,
+      "disabled": false
+    },
+    {
+      "erp_id": "Finished Goods - DMC",
+      "text": "Finished Goods",
+      "warehouse_name": "Finished Goods",
+      "warehouse_type": "Finished Goods",
+      "company": "Demo Manufacturing Co",
+      "is_group": false,
+      "disabled": false
+    }
+  ],
+
+  "tax_templates": [
+    {
+      "erp_id": "India Tax - DMC",
+      "text": "India Tax",
+      "title": "India Tax",
+      "company": "Demo Manufacturing Co",
+      "disabled": false
+    }
   ]
 }

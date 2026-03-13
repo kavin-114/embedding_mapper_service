@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Backtest — Embedding Mapper</title>
+<style>
+  :root {
+    --green: #22c55e; --green-bg: #f0fdf4; --green-border: #86efac;
+    --amber: #f59e0b; --amber-bg: #fffbeb; --amber-border: #fcd34d;
+    --orange: #f97316; --orange-bg: #fff7ed; --orange-border: #fdba74;
+    --red: #ef4444; --red-bg: #fef2f2; --red-border: #fca5a5;
+    --blue: #3b82f6; --blue-bg: #eff6ff; --blue-border: #93c5fd;
+    --gray: #6b7280; --bg: #f9fafb; --card-bg: #ffffff;
+    --border: #e5e7eb; --text: #111827; --text-muted: #6b7280;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+  .header { background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; gap: 16px; position: sticky; top: 0; z-index: 10; }
+  .logo { font-weight: 700; font-size: 16px; color: var(--blue); }
+  .nav-link { font-size: 13px; color: var(--text-muted); text-decoration: none; }
+  .nav-link:hover { color: var(--text); }
+
+  .content { padding: 20px; max-width: 1200px; margin: 0 auto; }
+
+  /* Cards */
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; }
+  .card-header { padding: 12px 16px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; }
+  .card-header:hover { background: #f9fafb; }
+  .card-title { font-weight: 700; font-size: 13px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; }
+  .card-toggle { font-size: 18px; color: var(--text-muted); transition: transform 0.2s; }
+  .card.collapsed .card-toggle { transform: rotate(-90deg); }
+  .card-body { padding: 0 16px 16px; }
+  .card.collapsed .card-body { display: none; }
+
+  /* Form */
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-group label { font-weight: 600; font-size: 12px; color: var(--text-muted); }
+  .form-group input, .form-group select { padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
+  .form-group input:focus, .form-group select:focus { outline: 2px solid var(--blue); border-color: transparent; }
+  .form-actions { display: flex; gap: 8px; margin-top: 4px; }
+
+  /* Buttons */
+  button { padding: 8px 20px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .btn-primary { background: var(--blue); color: white; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+  .btn-success { background: var(--green); color: white; }
+  .btn-success:hover { background: #16a34a; }
+  .btn-success:disabled { background: #86efac; cursor: not-allowed; }
+  .btn-secondary { background: #e5e7eb; color: var(--text); }
+
+  /* Progress */
+  .progress-bar-wrap { background: #e5e7eb; border-radius: 6px; height: 8px; margin: 8px 0; overflow: hidden; }
+  .progress-bar { background: var(--blue); height: 100%; transition: width 0.3s; border-radius: 6px; }
+  .progress-text { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+
+  /* Seed entity list */
+  .entity-list { list-style: none; }
+  .entity-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #f3f4f6; font-size: 13px; }
+  .entity-status { width: 20px; text-align: center; font-size: 16px; }
+  .entity-name { font-weight: 600; min-width: 120px; }
+  .entity-detail { color: var(--text-muted); font-size: 12px; }
+  .status-pending { color: var(--gray); }
+  .status-running { color: var(--blue); }
+  .status-done { color: var(--green); }
+  .status-error { color: var(--red); }
+
+  /* Results table */
+  .results-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .results-table th { text-align: left; padding: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); border-bottom: 2px solid var(--border); }
+  .results-table td { padding: 8px; border-bottom: 1px solid #f3f4f6; }
+  .results-table tr:hover { background: #f9fafb; }
+  .results-table .acc-cell { font-weight: 700; font-family: monospace; }
+
+  /* Stat cards */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
+  .stat-value { font-size: 28px; font-weight: 800; }
+  .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
+
+  /* Breakdown tables */
+  .breakdown-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 12px; }
+  .breakdown-table th { text-align: left; padding: 6px 8px; font-size: 11px; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+  .breakdown-table td { padding: 6px 8px; border-bottom: 1px solid #f3f4f6; }
+
+  .acc-perfect { color: var(--green); }
+  .acc-good { color: #16a34a; }
+  .acc-partial { color: var(--amber); }
+  .acc-poor { color: var(--red); }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .badge-green { background: var(--green-bg); color: #15803d; border: 1px solid var(--green-border); }
+  .badge-red { background: var(--red-bg); color: #991b1b; border: 1px solid var(--red-border); }
+
+  .hidden { display: none; }
+
+  .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; color: white; font-weight: 600; font-size: 13px; z-index: 200; display: none; }
+  .toast.error { background: var(--red); display: block; }
+  .toast.success { background: var(--green); display: block; }
+
+  .review-link { color: var(--blue); text-decoration: none; font-size: 12px; }
+  .review-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="logo">Backtest</span>
+  <a href="/review" class="nav-link">Review UI</a>
+  <a href="/docs" class="nav-link">API Docs</a>
+</div>
+
+<div class="content">
+  <!-- Config -->
+  <div class="card" id="configCard">
+    <div class="card-header" onclick="toggleCard('configCard')">
+      <span class="card-title">Configuration</span>
+      <span class="card-toggle">&#9660;</span>
+    </div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Tenant ID</label>
+          <input type="text" id="cfgTenant" value="alfarsi">
+        </div>
+        <div class="form-group">
+          <label>ERP System</label>
+          <input type="text" id="cfgErp" value="erpnext">
+        </div>
+        <div class="form-group">
+          <label>ERPNext URL</label>
+          <input type="text" id="cfgUrl" placeholder="from .env if blank">
+        </div>
+        <div class="form-group">
+          <label>API Key</label>
+          <input type="text" id="cfgKey" placeholder="from .env if blank">
+        </div>
+        <div class="form-group">
+          <label>API Secret</label>
+          <input type="text" id="cfgSecret" placeholder="from .env if blank">
+        </div>
+        <div class="form-group">
+          <label>Limit (0 = all)</label>
+          <input type="number" id="cfgLimit" value="0" min="0">
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Invoices Directory</label>
+          <input type="text" id="cfgInvDir" placeholder="/path/to/extractor/outputs">
+        </div>
+        <div class="form-group">
+          <label>Format</label>
+          <select id="cfgFormat">
+            <option value="extractor">Extractor</option>
+            <option value="canonical">Canonical</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Invoice Map (extractor only)</label>
+          <input type="text" id="cfgInvMap" placeholder="data/file_to_invoice_map.json">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-success" id="btnSeed" onclick="startSeed()">Seed ChromaDB</button>
+        <button class="btn-primary" id="btnRun" onclick="startBacktest()">Run Backtest</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Seed Progress -->
+  <div class="card hidden" id="seedCard">
+    <div class="card-header" onclick="toggleCard('seedCard')">
+      <span class="card-title">Seed Progress</span>
+      <span class="card-toggle">&#9660;</span>
+    </div>
+    <div class="card-body">
+      <div class="progress-text" id="seedProgressText">Starting...</div>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="seedProgressBar" style="width:0%"></div></div>
+      <ul class="entity-list" id="seedEntityList"></ul>
+    </div>
+  </div>
+
+  <!-- Backtest Progress -->
+  <div class="card hidden" id="progressCard">
+    <div class="card-header" onclick="toggleCard('progressCard')">
+      <span class="card-title">Backtest Progress</span>
+      <span class="card-toggle">&#9660;</span>
+    </div>
+    <div class="card-body">
+      <div class="progress-text" id="btProgressText">Waiting...</div>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="btProgressBar" style="width:0%"></div></div>
+      <table class="results-table">
+        <thead><tr><th>#</th><th>Invoice</th><th>Supplier</th><th>Accuracy</th><th>Status</th><th></th></tr></thead>
+        <tbody id="btResultsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="card hidden" id="summaryCard">
+    <div class="card-header" onclick="toggleCard('summaryCard')">
+      <span class="card-title">Summary</span>
+      <span class="card-toggle">&#9660;</span>
+    </div>
+    <div class="card-body">
+      <div class="stat-grid" id="statGrid"></div>
+      <div id="breakdownArea"></div>
+      <div id="failuresArea"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Config persistence ────────────────────────────────────
+
+// Fields persisted to localStorage (exclude sensitive credentials)
+const CFG_FIELDS = ['cfgTenant','cfgErp','cfgUrl','cfgLimit','cfgInvDir','cfgFormat','cfgInvMap'];
+
+function saveConfig() {
+  const cfg = {};
+  CFG_FIELDS.forEach(id => { cfg[id] = document.getElementById(id).value; });
+  localStorage.setItem('backtest_config', JSON.stringify(cfg));
+}
+
+function loadConfig() {
+  try {
+    const cfg = JSON.parse(localStorage.getItem('backtest_config') || '{}');
+    CFG_FIELDS.forEach(id => { if (cfg[id]) document.getElementById(id).value = cfg[id]; });
+  } catch {}
+}
+
+async function loadServerDefaults() {
+  try {
+    const resp = await fetch('/api/v1/backtest/config');
+    if (!resp.ok) return;
+    const defaults = await resp.json();
+    // Set URL and dir as values (not sensitive)
+    const valueFields = { cfgUrl: defaults.erpnext_url, cfgInvDir: defaults.review_files_dir };
+    for (const [id, val] of Object.entries(valueFields)) {
+      const el = document.getElementById(id);
+      if (el && !el.value && val) el.value = val;
+    }
+    // Show masked key/secret as placeholders only — send empty so backend uses .env
+    const placeholderFields = { cfgKey: defaults.erpnext_api_key, cfgSecret: defaults.erpnext_api_secret };
+    for (const [id, val] of Object.entries(placeholderFields)) {
+      const el = document.getElementById(id);
+      if (el && !el.value && val) el.placeholder = val;
+    }
+  } catch {}
+}
+
+loadConfig();
+// Clean up any stale masked credentials from older localStorage entries
+try {
+  const raw = localStorage.getItem('backtest_config');
+  if (raw) {
+    const cfg = JSON.parse(raw);
+    if (cfg.cfgKey || cfg.cfgSecret) {
+      delete cfg.cfgKey;
+      delete cfg.cfgSecret;
+      localStorage.setItem('backtest_config', JSON.stringify(cfg));
+    }
+  }
+} catch {}
+loadServerDefaults();
+
+// ── Card toggle ───────────────────────────────────────────
+
+function toggleCard(id) { document.getElementById(id).classList.toggle('collapsed'); }
+function showCard(id) { const el = document.getElementById(id); el.classList.remove('hidden','collapsed'); }
+
+// ── SSE parser for POST fetch ─────────────────────────────
+
+async function fetchSSE(url, body, onEvent) {
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({detail:'Request failed'}));
+    throw new Error(err.detail || 'Request failed');
+  }
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const {done, value} = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, {stream: true});
+
+    const parts = buffer.split('\n\n');
+    buffer = parts.pop();
+
+    for (const part of parts) {
+      const lines = part.split('\n');
+      let eventType = 'message';
+      let dataStr = '';
+      for (const line of lines) {
+        if (line.startsWith('event: ')) eventType = line.slice(7);
+        else if (line.startsWith('data: ')) dataStr += line.slice(6);
+      }
+      if (dataStr) {
+        try { onEvent(eventType, JSON.parse(dataStr)); } catch {}
+      }
+    }
+  }
+}
+
+// ── Seed ──────────────────────────────────────────────────
+
+const ENTITIES = ['vendors','items','tax_codes','uoms','companies','addresses','cost_centers','warehouses','tax_templates'];
+
+async function startSeed() {
+  saveConfig();
+  const btn = document.getElementById('btnSeed');
+  btn.disabled = true; btn.textContent = 'Seeding...';
+
+  showCard('seedCard');
+  const list = document.getElementById('seedEntityList');
+  list.innerHTML = '';
+  ENTITIES.forEach(e => {
+    const li = document.createElement('li');
+    li.className = 'entity-row';
+    li.id = 'seed_' + e;
+    li.innerHTML = `<span class="entity-status status-pending">&#9679;</span><span class="entity-name">${e}</span><span class="entity-detail">pending</span>`;
+    list.appendChild(li);
+  });
+
+  const body = {
+    erp_url: document.getElementById('cfgUrl').value,
+    api_key: document.getElementById('cfgKey').value,
+    api_secret: document.getElementById('cfgSecret').value,
+    tenant_id: document.getElementById('cfgTenant').value,
+    erp_system: document.getElementById('cfgErp').value,
+    limit: parseInt(document.getElementById('cfgLimit').value) || 0,
+  };
+
+  try {
+    await fetchSSE('/api/v1/backtest/seed', body, (evt, data) => {
+      if (data.type === 'entity_start') {
+        const row = document.getElementById('seed_' + data.entity);
+        if (row) {
+          row.querySelector('.entity-status').className = 'entity-status status-running';
+          row.querySelector('.entity-status').innerHTML = '&#8635;';
+          row.querySelector('.entity-detail').textContent = 'fetching...';
+        }
+        document.getElementById('seedProgressText').textContent = `Seeding ${data.entity} (${data.index+1}/${data.total})...`;
+        document.getElementById('seedProgressBar').style.width = ((data.index) / data.total * 100) + '%';
+      } else if (data.type === 'entity_done') {
+        const row = document.getElementById('seed_' + data.entity);
+        if (row) {
+          row.querySelector('.entity-status').className = 'entity-status status-done';
+          row.querySelector('.entity-status').innerHTML = '&#10003;';
+          row.querySelector('.entity-detail').textContent = `${data.fetched} fetched, ${data.upserted} upserted`;
+        }
+        document.getElementById('seedProgressBar').style.width = ((data.index+1) / data.total * 100) + '%';
+      } else if (data.type === 'entity_error') {
+        const row = document.getElementById('seed_' + data.entity);
+        if (row) {
+          row.querySelector('.entity-status').className = 'entity-status status-error';
+          row.querySelector('.entity-status').innerHTML = '&#10007;';
+          row.querySelector('.entity-detail').textContent = data.error;
+        }
+      } else if (data.type === 'complete') {
+        document.getElementById('seedProgressText').textContent = `Done! ${data.total_upserted} records in ${data.duration_s}s`;
+        document.getElementById('seedProgressBar').style.width = '100%';
+        document.getElementById('seedProgressBar').style.background = 'var(--green)';
+      } else if (data.type === 'error') {
+        showToast(data.message, 'error');
+      }
+    });
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+
+  btn.disabled = false; btn.textContent = 'Seed ChromaDB';
+}
+
+// ── Backtest ──────────────────────────────────────────────
+
+async function startBacktest() {
+  saveConfig();
+  const btn = document.getElementById('btnRun');
+  btn.disabled = true; btn.textContent = 'Running...';
+
+  showCard('progressCard');
+  document.getElementById('btResultsBody').innerHTML = '';
+  document.getElementById('btProgressText').textContent = 'Loading invoices...';
+  document.getElementById('btProgressBar').style.width = '0%';
+  document.getElementById('btProgressBar').style.background = 'var(--blue)';
+
+  // Hide old summary
+  document.getElementById('summaryCard').classList.add('hidden');
+
+  const body = {
+    erp_url: document.getElementById('cfgUrl').value,
+    api_key: document.getElementById('cfgKey').value,
+    api_secret: document.getElementById('cfgSecret').value,
+    tenant_id: document.getElementById('cfgTenant').value,
+    erp_system: document.getElementById('cfgErp').value,
+    invoices_dir: document.getElementById('cfgInvDir').value,
+    format: document.getElementById('cfgFormat').value,
+    invoice_map: document.getElementById('cfgInvMap').value || null,
+  };
+
+  let rowNum = 0;
+
+  try {
+    await fetchSSE('/api/v1/backtest/run', body, (evt, data) => {
+      if (data.type === 'loaded') {
+        document.getElementById('btProgressText').textContent = `Loaded ${data.count} invoices (${data.format}). Running...`;
+      } else if (data.type === 'invoice') {
+        rowNum++;
+        const tbody = document.getElementById('btResultsBody');
+        const tr = document.createElement('tr');
+        const accClass = accColorClass(data.accuracy);
+        const icon = data.accuracy >= 0.8
+          ? '<span class="badge badge-green">PASS</span>'
+          : '<span class="badge badge-red">FAIL</span>';
+        tr.innerHTML = `
+          <td>${rowNum}</td>
+          <td>${esc(data.label)}</td>
+          <td>${esc(data.supplier)}</td>
+          <td class="acc-cell ${accClass}">${(data.accuracy * 100).toFixed(1)}%</td>
+          <td>${icon}</td>
+          <td><a href="/review" target="_blank" class="review-link">Review</a></td>
+        `;
+        tbody.appendChild(tr);
+        document.getElementById('btProgressText').textContent = `${data.done} / ${data.total} invoices processed`;
+        document.getElementById('btProgressBar').style.width = (data.done / data.total * 100) + '%';
+      } else if (data.type === 'invoice_error') {
+        rowNum++;
+        const tbody = document.getElementById('btResultsBody');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${rowNum}</td>
+          <td>${esc(data.label)}</td>
+          <td colspan="3" style="color:var(--red)">${esc(data.error)}</td>
+          <td></td>
+        `;
+        tbody.appendChild(tr);
+        document.getElementById('btProgressText').textContent = `${data.done} / ${data.total} invoices processed`;
+        document.getElementById('btProgressBar').style.width = (data.done / data.total * 100) + '%';
+      } else if (data.type === 'summary') {
+        renderSummary(data);
+        document.getElementById('btProgressBar').style.width = '100%';
+        document.getElementById('btProgressBar').style.background = 'var(--green)';
+        document.getElementById('btProgressText').textContent = `Complete: ${data.invoice_count} invoices evaluated`;
+      } else if (data.type === 'error') {
+        showToast(data.message, 'error');
+      }
+    });
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+
+  btn.disabled = false; btn.textContent = 'Run Backtest';
+}
+
+// ── Render summary ────────────────────────────────────────
+
+function renderSummary(data) {
+  showCard('summaryCard');
+
+  // Stat cards
+  const grid = document.getElementById('statGrid');
+  const overallClass = accColorClass(data.overall_accuracy);
+  let statsHtml = `
+    <div class="stat-card">
+      <div class="stat-value ${overallClass}">${(data.overall_accuracy * 100).toFixed(1)}%</div>
+      <div class="stat-label">Overall Accuracy</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${data.invoice_count}</div>
+      <div class="stat-label">Invoices</div>
+    </div>
+  `;
+
+  // Per field type stats
+  if (data.by_field_type) {
+    for (const [ft, stats] of Object.entries(data.by_field_type)) {
+      const cls = accColorClass(stats.accuracy);
+      statsHtml += `
+        <div class="stat-card">
+          <div class="stat-value ${cls}">${(stats.accuracy * 100).toFixed(1)}%</div>
+          <div class="stat-label">${esc(ft)} (${stats.correct}/${stats.total})</div>
+        </div>
+      `;
+    }
+  }
+  grid.innerHTML = statsHtml;
+
+  // Breakdowns
+  const area = document.getElementById('breakdownArea');
+  let bdHtml = '';
+
+  if (data.by_strategy && Object.keys(data.by_strategy).length > 0) {
+    bdHtml += '<h4 style="margin:12px 0 6px;font-size:13px;color:var(--text-muted)">By Strategy</h4>';
+    bdHtml += renderBreakdownTable(data.by_strategy);
+  }
+  if (data.by_status && Object.keys(data.by_status).length > 0) {
+    bdHtml += '<h4 style="margin:12px 0 6px;font-size:13px;color:var(--text-muted)">By Status</h4>';
+    bdHtml += renderBreakdownTable(data.by_status);
+  }
+  area.innerHTML = bdHtml;
+
+  // Failures
+  const fArea = document.getElementById('failuresArea');
+  if (data.failures && data.failures.length > 0) {
+    let fHtml = '<h4 style="margin:16px 0 6px;font-size:13px;color:var(--red)">Failures (' + data.failures.length + ')</h4>';
+    fHtml += '<table class="breakdown-table"><thead><tr><th>Invoice</th><th>Field</th><th>Expected</th><th>Got</th><th>Strategy</th></tr></thead><tbody>';
+    data.failures.forEach(f => {
+      fHtml += `<tr>
+        <td>${esc(f.invoice || '')}</td>
+        <td>${esc(f.field_name)}</td>
+        <td>${esc(f.expected_erp_id)}</td>
+        <td>${esc(String(f.actual_erp_id || '—'))}</td>
+        <td>${esc(f.strategy || '—')}</td>
+      </tr>`;
+    });
+    fHtml += '</tbody></table>';
+    fArea.innerHTML = fHtml;
+  } else {
+    fArea.innerHTML = '';
+  }
+}
+
+function renderBreakdownTable(obj) {
+  let html = '<table class="breakdown-table"><thead><tr><th>Type</th><th>Correct</th><th>Total</th><th>Accuracy</th></tr></thead><tbody>';
+  for (const [key, stats] of Object.entries(obj)) {
+    const cls = accColorClass(stats.accuracy);
+    html += `<tr><td>${esc(key)}</td><td>${stats.correct}</td><td>${stats.total}</td><td class="${cls}" style="font-weight:700">${(stats.accuracy * 100).toFixed(1)}%</td></tr>`;
+  }
+  html += '</tbody></table>';
+  return html;
+}
+
+// ── Helpers ───────────────────────────────────────────────
+
+function accColorClass(acc) {
+  if (acc >= 1.0) return 'acc-perfect';
+  if (acc >= 0.8) return 'acc-good';
+  if (acc >= 0.5) return 'acc-partial';
+  return 'acc-poor';
+}
+
+function esc(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type;
+  setTimeout(() => { t.className = 'toast'; }, 5000);
+}
+</script>
+</body>
+</html>

@@ -7,8 +7,12 @@ from typing import Any, Callable, TYPE_CHECKING
 
 import chromadb
 
+from app.logging_config import get_logger
+
 if TYPE_CHECKING:
     from app.config import Settings
+
+logger = get_logger(__name__)
 
 # ChromaDB stores distances; we convert to similarity scores.
 # For cosine distance: score = 1 - distance
@@ -49,11 +53,57 @@ def _build_text_uoms(rec: dict[str, Any]) -> str:
     return rec.get("text", rec.get("uom_code", ""))
 
 
+def _build_text_companies(rec: dict[str, Any]) -> str:
+    parts = [rec.get("text", "")]
+    if rec.get("country"):
+        parts.append(rec["country"])
+    return " ".join(p for p in parts if p)
+
+
+def _build_text_addresses(rec: dict[str, Any]) -> str:
+    parts = [rec.get("text", "")]
+    if rec.get("address_line1"):
+        parts.append(rec["address_line1"])
+    if rec.get("city"):
+        parts.append(rec["city"])
+    if rec.get("country"):
+        parts.append(rec["country"])
+    return " ".join(p for p in parts if p)
+
+
+def _build_text_cost_centers(rec: dict[str, Any]) -> str:
+    parts = [rec.get("text", "")]
+    if rec.get("company"):
+        parts.append(rec["company"])
+    return " ".join(p for p in parts if p)
+
+
+def _build_text_warehouses(rec: dict[str, Any]) -> str:
+    parts = [rec.get("text", "")]
+    if rec.get("warehouse_type"):
+        parts.append(rec["warehouse_type"])
+    if rec.get("company"):
+        parts.append(rec["company"])
+    return " ".join(p for p in parts if p)
+
+
+def _build_text_tax_templates(rec: dict[str, Any]) -> str:
+    parts = [rec.get("text", "")]
+    if rec.get("company"):
+        parts.append(rec["company"])
+    return " ".join(p for p in parts if p)
+
+
 _TEXT_BUILDERS: dict[str, Callable[[dict[str, Any]], str]] = {
     "vendors": _build_text_vendors,
     "items": _build_text_items,
     "tax_codes": _build_text_tax_codes,
     "uoms": _build_text_uoms,
+    "companies": _build_text_companies,
+    "addresses": _build_text_addresses,
+    "cost_centers": _build_text_cost_centers,
+    "warehouses": _build_text_warehouses,
+    "tax_templates": _build_text_tax_templates,
 }
 
 # Fields that are stored as metadata (everything except 'text' and 'erp_id')
@@ -138,16 +188,25 @@ class VectorService:
                         meta[k] = str(v)
             metadatas.append(meta)
 
-        collection.upsert(
-            ids=ids,
-            embeddings=embeddings,
-            metadatas=metadatas,
-            documents=documents,
-        )
+        # ChromaDB has a max batch size — upsert in chunks
+        batch_size = 5000
+        for i in range(0, len(ids), batch_size):
+            collection.upsert(
+                ids=ids[i:i + batch_size],
+                embeddings=embeddings[i:i + batch_size],
+                metadatas=metadatas[i:i + batch_size],
+                documents=documents[i:i + batch_size],
+            )
 
         # Record sync timestamp
         key = self.collection_name(entity, tenant_id, erp_system)
         self._sync_times[key] = synced_at
+
+        logger.debug(
+            "vector.upsert",
+            collection=key,
+            record_count=len(records),
+        )
 
         return len(records)
 
@@ -165,13 +224,16 @@ class VectorService:
         Returns the first matching record's metadata dict (including erp_id),
         or None if no match.
         """
+        coll_name = self.collection_name(entity, tenant_id, erp_system)
         collection = self._get_collection(entity, tenant_id, erp_system)
         results = collection.get(where=where, limit=1)
 
         if not results["ids"]:
+            logger.debug("vector.hard_match", collection=coll_name, where=where, found=False)
             return None
 
         meta = results["metadatas"][0]
+        logger.debug("vector.hard_match", collection=coll_name, where=where, found=True)
         return meta
 
     def semantic_search(
@@ -189,6 +251,7 @@ class VectorService:
           erp_id, metadata, distance, score
         sorted by descending score.
         """
+        coll_name = self.collection_name(entity, tenant_id, erp_system)
         collection = self._get_collection(entity, tenant_id, erp_system)
 
         query_kwargs: dict[str, Any] = {
@@ -210,6 +273,7 @@ class VectorService:
                 return []
 
         if not results["ids"] or not results["ids"][0]:
+            logger.debug("vector.query", collection=coll_name, n_results=n_results, results_count=0)
             return []
 
         output = []
@@ -222,6 +286,14 @@ class VectorService:
                 "distance": dist,
                 "score": _DISTANCE_TO_SCORE(dist),
             })
+
+        logger.debug(
+            "vector.query",
+            collection=coll_name,
+            n_results=n_results,
+            results_count=len(output),
+            filter_applied=where is not None,
+        )
 
         return output
 
@@ -314,6 +386,66 @@ class VectorService:
         )
 
         return len(items)
+
+    def search_vendor_context(
+        self,
+        tenant_id: str,
+        erp_system: str,
+        query_embedding: list[float],
+        n_results: int = 3,
+        where: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Semantic search on vendor_context collection.
+
+        Uses get_collection (not get_or_create) to avoid creating empty
+        collections for tenants with no feedback history.
+
+        Args:
+            where: Optional metadata filter (e.g. {"vendor_erp_id": "SUP-001"})
+
+        Returns same format as semantic_search():
+          [{erp_id, metadata, distance, score}, ...]
+        """
+        coll_name = self.collection_name("vendor_context", tenant_id, erp_system)
+        try:
+            collection = self.client.get_collection(
+                name=coll_name,
+            )
+        except Exception:
+            logger.debug("vector.search_vendor_context.no_collection", collection=coll_name)
+            return []
+
+        try:
+            query_kwargs: dict[str, Any] = {
+                "query_embeddings": [query_embedding],
+                "n_results": n_results,
+            }
+            if where:
+                query_kwargs["where"] = where
+            results = collection.query(**query_kwargs)
+        except Exception:
+            return []
+
+        if not results["ids"] or not results["ids"][0]:
+            return []
+
+        output = []
+        for i, doc_id in enumerate(results["ids"][0]):
+            dist = results["distances"][0][i]
+            meta = results["metadatas"][0][i]
+            output.append({
+                "erp_id": meta.get("erp_id", doc_id),
+                "metadata": meta,
+                "distance": dist,
+                "score": _DISTANCE_TO_SCORE(dist),
+            })
+
+        logger.debug(
+            "vector.search_vendor_context",
+            collection=coll_name,
+            results_count=len(output),
+        )
+        return output
 
     def get_vendor_context(
         self,
